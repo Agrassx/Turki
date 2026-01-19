@@ -1,6 +1,6 @@
 package com.turki.core.domain
 
-import kotlin.time.Instant
+import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 
 @Serializable

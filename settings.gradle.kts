@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 include(":core")
 include(":bot")
 include(":admin")
+include(":admin-web")

@@ -5,24 +5,25 @@ plugins {
 }
 
 application {
-    mainClass.set("com.turki.bot.MainKt")
+    mainClass.set("com.turki.admin.web.AdminServerKt")
 }
 
 dependencies {
     implementation(projects.core)
     implementation(libs.bundles.kotlin.common)
     implementation(libs.bundles.ktor.server)
-    implementation(libs.telegram.bot)
+    implementation("io.ktor:ktor-server-html-builder:${libs.versions.ktor.get()}")
+    implementation("io.ktor:ktor-server-content-negotiation:${libs.versions.ktor.get()}")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:${libs.versions.ktor.get()}")
     implementation(libs.koin.core)
     implementation(libs.koin.ktor)
     implementation(libs.logback.classic)
-    implementation(libs.quartz)
 }
 
 tasks.jar {
     dependsOn(":core:jar")
     manifest {
-        attributes["Main-Class"] = "com.turki.bot.MainKt"
+        attributes["Main-Class"] = "com.turki.admin.web.AdminServerKt"
     }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from(configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) })

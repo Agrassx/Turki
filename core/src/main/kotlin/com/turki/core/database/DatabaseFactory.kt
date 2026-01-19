@@ -7,15 +7,62 @@ import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransacti
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.io.File
 
+/**
+ * Factory object for database initialization and connection management.
+ *
+ * This object handles SQLite database setup, schema creation, and provides
+ * a coroutine-safe query execution method. It automatically:
+ * - Creates the database file if it doesn't exist
+ * - Creates all required tables (users, lessons, vocabulary, homework, etc.)
+ * - Manages database connections using Exposed ORM
+ *
+ * **Database Schema:**
+ * - UsersTable - User accounts and progress tracking
+ * - LessonsTable - Language lessons content
+ * - VocabularyTable - Vocabulary items per lesson
+ * - HomeworksTable - Homework assignments
+ * - HomeworkQuestionsTable - Questions for each homework
+ * - HomeworkSubmissionsTable - User submissions and scores
+ * - RemindersTable - Scheduled reminders for users
+ */
 object DatabaseFactory {
 
-    fun init(dbPath: String = "data/turki.db") {
-        val resolvedPath = resolvePath(dbPath)
-        val dbFile = File(resolvedPath)
+    private var dbPath: String? = null
+
+    /**
+     * Initializes the database connection and creates all required tables.
+     *
+     * The database path is determined in the following order:
+     * 1. Provided [dbPath] parameter
+     * 2. DATABASE_PATH environment variable
+     * 3. Auto-detected project root + "/data/turki.db"
+     *
+     * This function:
+     * - Creates the database file and parent directories if needed
+     * - Establishes JDBC connection to SQLite
+     * - Creates all table schemas using Exposed ORM
+     * - Is safe to call multiple times (idempotent)
+     *
+     * @param dbPath Optional path to the SQLite database file.
+     *               If null, uses environment variable or default location.
+     *
+     * @sample
+     * ```
+     * DatabaseFactory.init()
+     * DatabaseFactory.init("data/custom.db")
+     * ```
+     */
+    fun init(dbPath: String? = null) {
+        val path = dbPath ?: System.getenv("DATABASE_PATH") ?: findProjectRoot() + "/data/turki.db"
+        this.dbPath = path
+        
+        val dbFile = File(path)
         dbFile.parentFile?.mkdirs()
 
+        println("📦 База данных: $path")
+
         val driverClassName = "org.sqlite.JDBC"
-        val jdbcUrl = "jdbc:sqlite:$resolvedPath"
+        val jdbcUrl = "jdbc:sqlite:$path"
 
         Database.connect(jdbcUrl, driverClassName)
 
@@ -32,24 +79,40 @@ object DatabaseFactory {
         }
     }
 
-    private fun resolvePath(path: String): String {
-        if (File(path).isAbsolute) return path
-
-        val currentDir = File(System.getProperty("user.dir"))
-
-        // Проверяем текущую директорию
-        val inCurrent = File(currentDir, path)
-        if (inCurrent.parentFile?.exists() == true) return inCurrent.absolutePath
-
-        // Проверяем родительскую директорию (если запуск из подмодуля)
-        val inParent = File(currentDir.parentFile, path)
-        if (inParent.parentFile?.exists() == true) return inParent.absolutePath
-
-        // Создаём в текущей директории
-        inCurrent.parentFile?.mkdirs()
-        return inCurrent.absolutePath
+    private fun findProjectRoot(): String {
+        var dir = File(System.getProperty("user.dir"))
+        
+        while (dir.parentFile != null) {
+            if (File(dir, "settings.gradle.kts").exists()) {
+                return dir.absolutePath
+            }
+            dir = dir.parentFile
+        }
+        
+        return System.getProperty("user.dir")
     }
 
+    /**
+     * Executes a database query in a coroutine-safe transaction.
+     *
+     * This function provides a suspendable way to execute database operations
+     * using Exposed ORM. All database queries should be wrapped in this function
+     * to ensure proper transaction management and coroutine safety.
+     *
+     * The transaction runs on the IO dispatcher to avoid blocking the main thread.
+     *
+     * @param block The suspendable block containing database operations
+     * @return The result of the block execution
+     *
+     * @sample
+     * ```
+     * val user = DatabaseFactory.dbQuery {
+     *     UsersTable.selectAll().where { UsersTable.id eq userId }
+     *         .map { toUser(it) }
+     *         .singleOrNull()
+     * }
+     * ```
+     */
     suspend fun <T> dbQuery(block: suspend () -> T): T =
         newSuspendedTransaction(Dispatchers.IO) { block() }
 }

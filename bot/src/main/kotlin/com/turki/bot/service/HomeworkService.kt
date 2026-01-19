@@ -5,19 +5,58 @@ import com.turki.core.domain.HomeworkQuestion
 import com.turki.core.domain.HomeworkSubmission
 import com.turki.core.repository.HomeworkRepository
 import com.turki.core.repository.UserRepository
-import kotlin.time.Clock
+import kotlinx.datetime.Clock
 
+/**
+ * Service for managing homework assignments and submissions.
+ *
+ * This service handles:
+ * - Retrieving homework for lessons
+ * - Processing homework submissions
+ * - Calculating scores
+ * - Advancing user progress when homework is completed successfully
+ * - Tracking completion status
+ *
+ * All operations are coroutine-based and thread-safe.
+ */
 class HomeworkService(
     private val homeworkRepository: HomeworkRepository,
     private val userRepository: UserRepository
 ) {
 
+    /**
+     * Retrieves homework assignment for a specific lesson.
+     *
+     * @param lessonId The lesson's database ID
+     * @return The [Homework] if found, null otherwise
+     */
     suspend fun getHomeworkForLesson(lessonId: Int): Homework? =
         homeworkRepository.findByLessonId(lessonId)
 
+    /**
+     * Retrieves all questions for a homework assignment.
+     *
+     * @param homeworkId The homework's database ID
+     * @return List of [HomeworkQuestion] objects
+     */
     suspend fun getHomeworkQuestions(homeworkId: Int): List<HomeworkQuestion> =
         homeworkRepository.findQuestions(homeworkId)
 
+    /**
+     * Submits homework answers and calculates the score.
+     *
+     * This function:
+     * - Validates answers against correct answers (case-insensitive)
+     * - Calculates the score based on correct answers
+     * - Creates a submission record
+     * - Advances user to next lesson if all answers are correct
+     *
+     * @param userId The user's database ID
+     * @param homeworkId The homework's database ID
+     * @param answers Map of question IDs to user answers
+     * @return The created [HomeworkSubmission] with calculated score
+     * @throws IllegalArgumentException if homework is not found
+     */
     suspend fun submitHomework(
         userId: Long,
         homeworkId: Int,
@@ -59,12 +98,31 @@ class HomeworkService(
         return savedSubmission
     }
 
+    /**
+     * Checks if a user has already completed a homework assignment.
+     *
+     * @param userId The user's database ID
+     * @param homeworkId The homework's database ID
+     * @return true if the user has completed the homework, false otherwise
+     */
     suspend fun hasCompletedHomework(userId: Long, homeworkId: Int): Boolean =
         homeworkRepository.hasUserCompletedHomework(userId, homeworkId)
 
+    /**
+     * Retrieves all homework submissions for a user.
+     *
+     * @param userId The user's database ID
+     * @return List of [HomeworkSubmission] objects
+     */
     suspend fun getUserSubmissions(userId: Long): List<HomeworkSubmission> =
         homeworkRepository.findSubmissionsByUser(userId)
 
+    /**
+     * Creates a new homework assignment in the database.
+     *
+     * @param homework The homework object to create
+     * @return The created [Homework] with assigned database ID
+     */
     suspend fun createHomework(homework: Homework): Homework =
         homeworkRepository.create(homework)
 }

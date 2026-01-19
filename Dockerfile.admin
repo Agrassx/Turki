@@ -10,11 +10,11 @@ COPY settings.gradle.kts .
 COPY gradle.properties .
 
 COPY core core
-COPY bot bot
 COPY admin admin
+COPY admin-web admin-web
 
 RUN chmod +x gradlew
-RUN ./gradlew :bot:jar --no-daemon
+RUN ./gradlew :admin-web:jar --no-daemon
 
 FROM eclipse-temurin:21-jre-alpine
 
@@ -24,12 +24,11 @@ RUN apk add --no-cache wget
 
 RUN mkdir -p /app/data
 
-COPY --from=build /app/bot/build/libs/*.jar /app/bot.jar
+COPY --from=build /app/admin-web/build/libs/*.jar /app/admin.jar
 
-EXPOSE 8080
+EXPOSE 8081
 
-ENV BOT_TOKEN=""
 ENV DB_PATH="/app/data/turki.db"
-ENV PORT="8080"
+ENV ADMIN_PORT="8081"
 
-ENTRYPOINT ["java", "-jar", "/app/bot.jar"]
+ENTRYPOINT ["java", "-jar", "/app/admin.jar"]

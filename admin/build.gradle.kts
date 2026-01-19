@@ -13,24 +13,27 @@ kotlin {
     sourceSets {
         val desktopMain by getting
 
-        commonMain.dependencies {
-            implementation(projects.core)
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.ui)
-            implementation(compose.components.resources)
-            implementation(libs.bundles.kotlin.common)
-            implementation(libs.bundles.ktor.client)
-            implementation(libs.ktor.serialization.json)
-            implementation(libs.koin.core)
-            implementation(libs.koin.compose)
+        val commonMain by getting {
+            dependencies {
+                implementation(projects.core)
+                implementation(compose.runtime)
+                implementation(compose.foundation)
+                implementation(compose.material3)
+                implementation(compose.ui)
+                implementation(compose.components.resources)
+                implementation(libs.bundles.kotlin.common)
+                implementation(libs.bundles.ktor.client)
+                implementation(libs.ktor.serialization.json)
+                implementation(libs.koin.core)
+                implementation(libs.koin.compose)
+            }
         }
 
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.core)
         }
+
     }
 }
 

@@ -3,10 +3,12 @@ package com.turki.core.database
 import com.turki.core.domain.Language
 import com.turki.core.domain.User
 import com.turki.core.repository.UserRepository
-import kotlin.time.Clock
-import kotlin.time.Instant
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import org.jetbrains.exposed.sql.Op
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNotNull
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -100,6 +102,23 @@ class UserRepositoryImpl : UserRepository {
 
     override suspend fun count(): Long = DatabaseFactory.dbQuery {
         UsersTable.selectAll().count()
+    }
+
+    override suspend fun resetProgress(userId: Long): Boolean = DatabaseFactory.dbQuery {
+        HomeworkSubmissionsTable.deleteWhere { HomeworkSubmissionsTable.userId eq userId }
+        UsersTable.update({ UsersTable.id eq userId }) {
+            it[currentLessonId] = 1
+            it[updatedAt] = Clock.System.now()
+        } > 0
+    }
+
+    override suspend fun resetAllProgress(): Boolean = DatabaseFactory.dbQuery {
+        HomeworkSubmissionsTable.deleteWhere { Op.TRUE }
+        val now = Clock.System.now()
+        UsersTable.update({ Op.TRUE }) {
+            it[currentLessonId] = 1
+            it[updatedAt] = now
+        } > 0
     }
 
     private fun toUser(row: ResultRow): User = User(

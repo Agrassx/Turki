@@ -1,19 +1,40 @@
 package com.turki.bot.handler
 
+import com.turki.bot.i18n.S
 import com.turki.bot.service.HomeworkService
 import com.turki.bot.service.LessonService
 import com.turki.bot.service.ReminderService
 import com.turki.bot.service.UserService
-import com.turki.bot.util.Messages
+import com.turki.bot.util.markdownToHtml
+import com.turki.bot.util.sendHtml
 import com.turki.core.domain.Language
 import com.turki.core.domain.QuestionType
 import dev.inmo.tgbotapi.extensions.api.answers.answer
-import dev.inmo.tgbotapi.extensions.api.send.sendMessage
 import dev.inmo.tgbotapi.extensions.behaviour_builder.BehaviourContext
 import dev.inmo.tgbotapi.types.buttons.InlineKeyboardMarkup
 import dev.inmo.tgbotapi.types.buttons.inline.dataInlineButton
 import dev.inmo.tgbotapi.types.queries.callback.DataCallbackQuery
 
+/**
+ * Handler for Telegram bot inline callback queries.
+ *
+ * This class processes all inline button callbacks sent by users, including:
+ * - Lesson navigation (lesson, next_lesson)
+ * - Vocabulary display (vocabulary)
+ * - Homework management (homework, start_homework, answer)
+ * - Progress tracking (progress)
+ * - Settings and configuration (settings, reset_progress, select_level)
+ * - Reminders (set_reminder)
+ * - Menu navigation (back_to_menu)
+ *
+ * Callback data format: `action:param1:param2:...`
+ * Examples:
+ * - `lesson:1` - Show lesson with ID 1
+ * - `answer:5:10:2:Option` - Submit answer for homework 5, question 10, option index 2
+ * - `vocabulary:3` - Show vocabulary for lesson 3
+ *
+ * All callbacks are processed asynchronously and send HTML-formatted responses.
+ */
 class CallbackHandler(
     private val userService: UserService,
     private val lessonService: LessonService,
@@ -37,6 +58,13 @@ class CallbackHandler(
             "progress" -> handleProgressCallback(context, query)
             "next_lesson" -> handleNextLessonCallback(context, query)
             "set_reminder" -> handleSetReminder(context, query)
+            "settings" -> handleSettings(context, query)
+            "reset_progress" -> handleResetProgress(context, query)
+            "confirm_reset" -> handleConfirmReset(context, query)
+            "select_level" -> handleSelectLevel(context, query)
+            "set_level" -> handleSetLevel(context, query, parts.getOrNull(1))
+            "knowledge_test" -> handleKnowledgeTest(context, query)
+            "back_to_menu" -> handleBackToMenu(context, query)
         }
     }
 
@@ -45,31 +73,33 @@ class CallbackHandler(
         query: DataCallbackQuery,
         lessonId: Int?
     ) {
-        if (lessonId == null) return
+        if (lessonId == null) {
+            return
+        }
 
         val lesson = lessonService.getLessonById(lessonId) ?: run {
-            context.sendMessage(query.from, Messages.LESSON_NOT_FOUND)
+            context.sendHtml(query.from, S.lessonNotFound)
             return
         }
 
         val lessonText = buildString {
-            appendLine("📚 *Урок ${lesson.orderIndex}: ${lesson.title}*")
+            appendLine(S.lessonTitle(lesson.orderIndex, lesson.title))
             appendLine()
-            appendLine(lesson.description)
+            appendLine(lesson.description.markdownToHtml())
             appendLine()
-            appendLine("---")
+            appendLine("─────────────────────")
             appendLine()
-            appendLine(lesson.content)
+            appendLine(lesson.content.markdownToHtml())
         }
 
-        context.sendMessage(
+        context.sendHtml(
             query.from,
             lessonText,
             replyMarkup = InlineKeyboardMarkup(
                 listOf(
-                    listOf(dataInlineButton("📖 Словарь урока", "vocabulary:${lesson.id}")),
-                    listOf(dataInlineButton("📝 Перейти к заданию", "homework:${lesson.id}")),
-                    listOf(dataInlineButton("⏰ Напомнить о занятии", "set_reminder"))
+                    listOf(dataInlineButton(S.btnVocabulary, "vocabulary:${lesson.id}")),
+                    listOf(dataInlineButton(S.btnGoToHomework, "homework:${lesson.id}")),
+                    listOf(dataInlineButton(S.btnSetReminder, "set_reminder"))
                 )
             )
         )
@@ -80,31 +110,33 @@ class CallbackHandler(
         query: DataCallbackQuery,
         lessonId: Int?
     ) {
-        if (lessonId == null) return
+        if (lessonId == null) {
+            return
+        }
 
         val vocabulary = lessonService.getVocabulary(lessonId)
 
         if (vocabulary.isEmpty()) {
-            context.sendMessage(query.from, "Словарь для этого урока пока пуст.")
+            context.sendHtml(query.from, S.vocabularyEmpty)
             return
         }
 
         val vocabText = buildString {
-            appendLine("📖 *Словарь урока*")
+            appendLine(S.vocabularyTitle)
             appendLine()
             vocabulary.forEach { item ->
-                appendLine("• *${item.word}* — ${item.translation}")
-                item.pronunciation?.let { appendLine("  🔊 [$it]") }
-                item.example?.let { appendLine("  📝 _${it}_") }
+                appendLine(S.vocabularyItem(item.word, item.translation))
+                item.pronunciation?.let { appendLine(S.vocabularyPronunciation(it)) }
+                item.example?.let { appendLine(S.vocabularyExample(it)) }
                 appendLine()
             }
         }
 
-        context.sendMessage(
+        context.sendHtml(
             query.from,
             vocabText,
             replyMarkup = InlineKeyboardMarkup(
-                listOf(listOf(dataInlineButton("📝 Перейти к заданию", "homework:$lessonId")))
+                listOf(listOf(dataInlineButton(S.btnGoToHomework, "homework:$lessonId")))
             )
         )
     }
@@ -114,13 +146,15 @@ class CallbackHandler(
         query: DataCallbackQuery,
         lessonId: Int?
     ) {
-        if (lessonId == null) return
+        if (lessonId == null) {
+            return
+        }
 
-        context.sendMessage(
+        context.sendHtml(
             query.from,
-            Messages.HOMEWORK_START,
+            S.homeworkStart,
             replyMarkup = InlineKeyboardMarkup(
-                listOf(listOf(dataInlineButton("📝 Начать домашнее задание", "start_homework:$lessonId")))
+                listOf(listOf(dataInlineButton(S.btnStartHomework, "start_homework:$lessonId")))
             )
         )
     }
@@ -130,21 +164,23 @@ class CallbackHandler(
         query: DataCallbackQuery,
         lessonId: Int?
     ) {
-        if (lessonId == null) return
+        if (lessonId == null) {
+            return
+        }
 
         val homework = homeworkService.getHomeworkForLesson(lessonId) ?: run {
-            context.sendMessage(query.from, "Домашнее задание для этого урока пока не готово.")
+            context.sendHtml(query.from, S.homeworkNotReady)
             return
         }
 
         val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
 
         if (homeworkService.hasCompletedHomework(user.id, homework.id)) {
-            context.sendMessage(
+            context.sendHtml(
                 query.from,
-                "Вы уже выполнили это задание! ✅",
+                S.homeworkAlreadyCompleted,
                 replyMarkup = InlineKeyboardMarkup(
-                    listOf(listOf(dataInlineButton("➡️ Следующий урок", "next_lesson")))
+                    listOf(listOf(dataInlineButton(S.btnNextLesson, "next_lesson")))
                 )
             )
             return
@@ -160,21 +196,21 @@ class CallbackHandler(
         index: Int,
         homeworkId: Int
     ) {
-        val questionText = "❓ *Вопрос ${index + 1}*\n\n${question.questionText}"
+        val questionText = "${S.questionTitle(index + 1)}\n\n${question.questionText}"
 
         when (question.questionType) {
             QuestionType.MULTIPLE_CHOICE -> {
                 val buttons = question.options.mapIndexed { optIndex, option ->
                     listOf(dataInlineButton(option, "answer:$homeworkId:${question.id}:$optIndex:$option"))
                 }
-                context.sendMessage(
+                context.sendHtml(
                     query.from,
                     questionText,
                     replyMarkup = InlineKeyboardMarkup(buttons)
                 )
             }
             QuestionType.TEXT_INPUT, QuestionType.TRANSLATION -> {
-                context.sendMessage(query.from, "$questionText\n\n_Напишите ваш ответ:_")
+                context.sendHtml(query.from, "$questionText\n\n${S.writeYourAnswer}")
                 HomeworkStateManager.setCurrentQuestion(query.from.id.chatId.long, homeworkId, question.id)
             }
         }
@@ -185,7 +221,9 @@ class CallbackHandler(
         query: DataCallbackQuery,
         parts: List<String>
     ) {
-        if (parts.size < 5) return
+        if (parts.size < 5) {
+            return
+        }
 
         val homeworkId = parts[1].toIntOrNull() ?: return
         val questionId = parts[2].toIntOrNull() ?: return
@@ -206,40 +244,40 @@ class CallbackHandler(
             HomeworkStateManager.clearState(user.telegramId)
 
             val resultText = if (submission.score == submission.maxScore) {
-                Messages.homeworkComplete(submission.score, submission.maxScore)
+                S.homeworkComplete(submission.score, submission.maxScore)
             } else {
-                Messages.homeworkResult(submission.score, submission.maxScore)
+                S.homeworkResult(submission.score, submission.maxScore)
             }
 
             val keyboard = if (submission.score == submission.maxScore) {
-                InlineKeyboardMarkup(listOf(listOf(dataInlineButton("➡️ Следующий урок", "next_lesson"))))
+                InlineKeyboardMarkup(listOf(listOf(dataInlineButton(S.btnNextLesson, "next_lesson"))))
             } else {
                 InlineKeyboardMarkup(
-                    listOf(listOf(dataInlineButton("🔄 Попробовать снова", "start_homework:${user.currentLessonId}")))
+                    listOf(listOf(dataInlineButton(S.btnTryAgain, "start_homework:${user.currentLessonId}")))
                 )
             }
 
-            context.sendMessage(query.from, resultText, replyMarkup = keyboard)
+            context.sendHtml(query.from, resultText, replyMarkup = keyboard)
         }
     }
 
     private suspend fun handleProgressCallback(context: BehaviourContext, query: DataCallbackQuery) {
         val user = userService.findByTelegramId(query.from.id.chatId.long) ?: run {
-            context.sendMessage(query.from, Messages.NOT_REGISTERED)
+            context.sendHtml(query.from, S.notRegistered)
             return
         }
 
         val totalLessons = lessonService.getLessonsByLanguage(Language.TURKISH).size
         val completedLessons = user.currentLessonId - 1
 
-        val progressText = Messages.progress(
+        val progressText = S.progress(
             firstName = user.firstName,
             completedLessons = completedLessons,
             totalLessons = totalLessons,
             subscriptionActive = user.subscriptionActive
         )
 
-        context.sendMessage(query.from, progressText)
+        context.sendHtml(query.from, progressText)
     }
 
     private suspend fun handleNextLessonCallback(context: BehaviourContext, query: DataCallbackQuery) {
@@ -248,27 +286,27 @@ class CallbackHandler(
         val nextLesson = lessonService.getNextLesson(user.currentLessonId, Language.TURKISH)
 
         if (nextLesson == null) {
-            context.sendMessage(query.from, Messages.ALL_LESSONS_COMPLETED)
+            context.sendHtml(query.from, S.allLessonsCompleted)
             return
         }
 
         val lessonText = buildString {
-            appendLine("📚 *Урок ${nextLesson.orderIndex}: ${nextLesson.title}*")
+            appendLine(S.lessonTitle(nextLesson.orderIndex, nextLesson.title))
             appendLine()
-            appendLine(nextLesson.description)
+            appendLine(nextLesson.description.markdownToHtml())
             appendLine()
-            appendLine("---")
+            appendLine("─────────────────────")
             appendLine()
-            appendLine(nextLesson.content)
+            appendLine(nextLesson.content.markdownToHtml())
         }
 
-        context.sendMessage(
+        context.sendHtml(
             query.from,
             lessonText,
             replyMarkup = InlineKeyboardMarkup(
                 listOf(
-                    listOf(dataInlineButton("📖 Словарь урока", "vocabulary:${nextLesson.id}")),
-                    listOf(dataInlineButton("📝 Перейти к заданию", "homework:${nextLesson.id}"))
+                    listOf(dataInlineButton(S.btnVocabulary, "vocabulary:${nextLesson.id}")),
+                    listOf(dataInlineButton(S.btnGoToHomework, "homework:${nextLesson.id}"))
                 )
             )
         )
@@ -277,7 +315,116 @@ class CallbackHandler(
     private suspend fun handleSetReminder(context: BehaviourContext, query: DataCallbackQuery) {
         val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
         reminderService.createHomeworkReminder(user.id)
-        context.sendMessage(query.from, Messages.REMINDER_SET)
+        context.sendHtml(query.from, S.reminderSet)
+    }
+
+    private suspend fun handleSettings(context: BehaviourContext, query: DataCallbackQuery) {
+        context.sendHtml(
+            query.from,
+            S.settingsTitle,
+            replyMarkup = InlineKeyboardMarkup(
+                listOf(
+                    listOf(dataInlineButton(S.btnResetProgress, "reset_progress")),
+                    listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
+                )
+            )
+        )
+    }
+
+    private suspend fun handleResetProgress(context: BehaviourContext, query: DataCallbackQuery) {
+        context.sendHtml(
+            query.from,
+            S.resetProgressConfirm,
+            replyMarkup = InlineKeyboardMarkup(
+                listOf(
+                    listOf(dataInlineButton(S.btnConfirmReset, "confirm_reset")),
+                    listOf(dataInlineButton(S.btnCancel, "settings"))
+                )
+            )
+        )
+    }
+
+    private suspend fun handleConfirmReset(context: BehaviourContext, query: DataCallbackQuery) {
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        userService.resetProgress(user.id)
+
+        context.sendHtml(
+            query.from,
+            S.progressResetSuccess,
+            replyMarkup = InlineKeyboardMarkup(
+                listOf(listOf(dataInlineButton("${S.btnStartLesson} 1", "lesson:1")))
+            )
+        )
+    }
+
+    private suspend fun handleSelectLevel(context: BehaviourContext, query: DataCallbackQuery) {
+        context.sendHtml(
+            query.from,
+            S.selectLevelTitle,
+            replyMarkup = InlineKeyboardMarkup(
+                listOf(
+                    listOf(
+                        dataInlineButton(S.btnLevelWithStatus("A1", true), "set_level:A1"),
+                        dataInlineButton(S.btnLevelWithStatus("A2", false), "set_level:A2")
+                    ),
+                    listOf(
+                        dataInlineButton(S.btnLevelWithStatus("B1", false), "set_level:B1"),
+                        dataInlineButton(S.btnLevelWithStatus("B2", false), "set_level:B2")
+                    ),
+                    listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
+                )
+            )
+        )
+    }
+
+    private suspend fun handleSetLevel(context: BehaviourContext, query: DataCallbackQuery, level: String?) {
+        if (level == null) {
+            return
+        }
+
+        val message = when (level) {
+            "A1" -> S.levelA1Active
+            else -> S.levelLocked(level)
+        }
+
+        context.sendHtml(
+            query.from,
+            message,
+            replyMarkup = InlineKeyboardMarkup(
+                listOf(listOf(dataInlineButton(S.btnBack, "select_level")))
+            )
+        )
+    }
+
+    private suspend fun handleKnowledgeTest(context: BehaviourContext, query: DataCallbackQuery) {
+        context.sendHtml(
+            query.from,
+            S.knowledgeTestTitle,
+            replyMarkup = InlineKeyboardMarkup(
+                listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
+            )
+        )
+    }
+
+    private suspend fun handleBackToMenu(context: BehaviourContext, query: DataCallbackQuery) {
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+
+        context.sendHtml(
+            query.from,
+            S.mainMenuTitle,
+            replyMarkup = InlineKeyboardMarkup(
+                listOf(
+                    listOf(dataInlineButton(S.btnContinueLesson, "lesson:${user.currentLessonId}")),
+                    listOf(dataInlineButton(S.btnHomework, "homework:${user.currentLessonId}")),
+                    listOf(dataInlineButton(S.btnProgress, "progress")),
+                    listOf(
+                        dataInlineButton(S.btnSelectLevel, "select_level"),
+                        dataInlineButton(S.btnKnowledgeTest, "knowledge_test")
+                    ),
+                    listOf(dataInlineButton(S.btnSettings, "settings"))
+                )
+            )
+        )
     }
 }
 

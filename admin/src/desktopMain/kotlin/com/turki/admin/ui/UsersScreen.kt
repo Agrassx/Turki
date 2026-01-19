@@ -65,13 +65,24 @@ fun UsersScreen(
                 fontWeight = FontWeight.Bold
             )
 
-            Button(
-                onClick = { viewModel.loadUsers() },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                Text("🔄 Обновить")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { viewModel.loadUsers() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Text("🔄 Обновить")
+                }
+
+                Button(
+                    onClick = { viewModel.resetAllProgress() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFE53935)
+                    )
+                ) {
+                    Text("🗑 Сбросить прогресс всех")
+                }
             }
         }
 
@@ -96,7 +107,8 @@ fun UsersScreen(
                 items(state.users) { user ->
                     UserCard(
                         user = user,
-                        onToggleSubscription = { viewModel.toggleSubscription(user) }
+                        onToggleSubscription = { viewModel.toggleSubscription(user) },
+                        onResetProgress = { viewModel.resetUserProgress(user) }
                     )
                 }
             }
@@ -107,7 +119,8 @@ fun UsersScreen(
 @Composable
 private fun UserCard(
     user: User,
-    onToggleSubscription: () -> Unit
+    onToggleSubscription: () -> Unit,
+    onResetProgress: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -123,7 +136,7 @@ private fun UserCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "${user.firstName} ${user.lastName ?: ""}",
                     color = MaterialTheme.colorScheme.onSurface,
@@ -159,28 +172,38 @@ private fun UserCard(
             }
 
             Row(
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = if (user.subscriptionActive) "Активна" else "Неактивна",
-                    color = if (user.subscriptionActive) Color(0xFF4CAF50) else Color.Gray,
-                    fontSize = 13.sp
-                )
+                Button(
+                    onClick = onResetProgress,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFF9800)
+                    )
+                ) {
+                    Text("↩ Сброс", fontSize = 12.sp)
+                }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = if (user.subscriptionActive) "Активна" else "Неактивна",
+                        color = if (user.subscriptionActive) Color(0xFF4CAF50) else Color.Gray,
+                        fontSize = 13.sp
+                    )
 
-                Switch(
-                    checked = user.subscriptionActive,
-                    onCheckedChange = { onToggleSubscription() }
-                )
+                    Switch(
+                        checked = user.subscriptionActive,
+                        onCheckedChange = { onToggleSubscription() }
+                    )
+                }
             }
         }
     }
 }
 
-private fun formatDate(instant: kotlin.time.Instant): String {
+private fun formatDate(instant: kotlinx.datetime.Instant): String {
     val dt = instant.toLocalDateTime(TimeZone.currentSystemDefault())
-    return "${dt.day.toString().padStart(2, '0')}.${
-        dt.month.toString().padStart(2, '0')
+    return "${dt.dayOfMonth.toString().padStart(2, '0')}.${
+        dt.monthNumber.toString().padStart(2, '0')
     }.${dt.year}"
 }

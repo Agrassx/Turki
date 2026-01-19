@@ -1,19 +1,30 @@
 package com.turki.bot.handler
 
+import com.turki.bot.i18n.S
 import com.turki.bot.service.HomeworkService
-import com.turki.bot.util.Messages
+import com.turki.bot.util.sendHtml
 import com.turki.core.domain.QuestionType
-import dev.inmo.tgbotapi.extensions.api.send.sendMessage
 import dev.inmo.tgbotapi.extensions.behaviour_builder.BehaviourContext
 import dev.inmo.tgbotapi.extensions.utils.extensions.raw.from
-import dev.inmo.tgbotapi.extensions.utils.types.buttons.dataButton
-import dev.inmo.tgbotapi.extensions.utils.types.buttons.inlineKeyboard
 import dev.inmo.tgbotapi.types.buttons.InlineKeyboardMarkup
 import dev.inmo.tgbotapi.types.buttons.inline.dataInlineButton
 import dev.inmo.tgbotapi.types.message.abstracts.CommonMessage
 import dev.inmo.tgbotapi.types.message.content.TextContent
 import org.koin.java.KoinJavaComponent.inject
 
+/**
+ * Handler for processing text answers to homework questions.
+ *
+ * This handler manages the interactive homework flow where users type answers
+ * to open-ended questions (TEXT_INPUT, TRANSLATION). It:
+ * - Tracks the current question state for each user
+ * - Collects answers as users respond
+ * - Advances to the next question or submits homework when complete
+ * - Displays results and appropriate navigation buttons
+ *
+ * The handler uses [HomeworkStateManager] to maintain state between messages.
+ * State is stored in memory and cleared after homework submission.
+ */
 class HomeworkHandler(private val homeworkService: HomeworkService) {
 
     private val userService: com.turki.bot.service.UserService by inject(
@@ -39,21 +50,21 @@ class HomeworkHandler(private val homeworkService: HomeworkService) {
 
         if (currentIndex < homework.questions.size - 1) {
             val nextQuestion = homework.questions[currentIndex + 1]
-            val questionText = "❓ *Вопрос ${currentIndex + 2}*\n\n${nextQuestion.questionText}"
+            val questionText = "${S.questionTitle(currentIndex + 2)}\n\n${nextQuestion.questionText}"
 
             when (nextQuestion.questionType) {
                 QuestionType.MULTIPLE_CHOICE -> {
                     val buttons = nextQuestion.options.mapIndexed { optIndex, option ->
                         listOf(dataInlineButton(option, "answer:$homeworkId:${nextQuestion.id}:$optIndex:$option"))
                     }
-                    context.sendMessage(
+                    context.sendHtml(
                         message.chat,
                         questionText,
                         replyMarkup = InlineKeyboardMarkup(buttons)
                     )
                 }
                 else -> {
-                    context.sendMessage(message.chat, "$questionText\n\n_Напишите ваш ответ:_")
+                    context.sendHtml(message.chat, "$questionText\n\n${S.writeYourAnswer}")
                     HomeworkStateManager.setCurrentQuestion(telegramId, homeworkId, nextQuestion.id)
                 }
             }
@@ -62,20 +73,20 @@ class HomeworkHandler(private val homeworkService: HomeworkService) {
             HomeworkStateManager.clearState(telegramId)
 
             val resultText = if (submission.score == submission.maxScore) {
-                Messages.homeworkComplete(submission.score, submission.maxScore)
+                S.homeworkComplete(submission.score, submission.maxScore)
             } else {
-                Messages.homeworkResult(submission.score, submission.maxScore)
+                S.homeworkResult(submission.score, submission.maxScore)
             }
 
             val keyboard = if (submission.score == submission.maxScore) {
-                InlineKeyboardMarkup(listOf(listOf(dataInlineButton("➡️ Следующий урок", "next_lesson"))))
+                InlineKeyboardMarkup(listOf(listOf(dataInlineButton(S.btnNextLesson, "next_lesson"))))
             } else {
                 InlineKeyboardMarkup(
-                    listOf(listOf(dataInlineButton("🔄 Попробовать снова", "start_homework:${user.currentLessonId}")))
+                    listOf(listOf(dataInlineButton(S.btnTryAgain, "start_homework:${user.currentLessonId}")))
                 )
             }
 
-            context.sendMessage(message.chat, resultText, replyMarkup = keyboard)
+            context.sendHtml(message.chat, resultText, replyMarkup = keyboard)
         }
     }
 }

@@ -1,10 +1,11 @@
 package com.turki.bot.handler
 
+import com.turki.bot.i18n.S
 import com.turki.bot.service.LessonService
 import com.turki.bot.service.UserService
-import com.turki.bot.util.Messages
+import com.turki.bot.util.markdownToHtml
+import com.turki.bot.util.sendHtml
 import com.turki.core.domain.Language
-import dev.inmo.tgbotapi.extensions.api.send.sendMessage
 import dev.inmo.tgbotapi.extensions.behaviour_builder.BehaviourContext
 import dev.inmo.tgbotapi.extensions.utils.extensions.raw.from
 import dev.inmo.tgbotapi.types.buttons.InlineKeyboardMarkup
@@ -12,6 +13,19 @@ import dev.inmo.tgbotapi.types.buttons.inline.dataInlineButton
 import dev.inmo.tgbotapi.types.message.abstracts.CommonMessage
 import dev.inmo.tgbotapi.types.message.content.TextContent
 
+/**
+ * Handler for Telegram bot text commands.
+ *
+ * This class processes all text commands sent by users to the bot, including:
+ * - /start - User registration and welcome message
+ * - /lesson - Display current lesson
+ * - /homework - Show homework options
+ * - /progress - Display user progress
+ * - /help - Show help information
+ * - /vocabulary - Display lesson vocabulary
+ *
+ * All commands are processed asynchronously and send HTML-formatted responses.
+ */
 class CommandHandler(
     private val userService: UserService,
     private val lessonService: LessonService
@@ -26,16 +40,21 @@ class CommandHandler(
             lastName = from.lastName
         )
 
-        val welcomeMessage = Messages.welcome(user.firstName)
+        val welcomeMessage = S.welcome(user.firstName)
 
-        context.sendMessage(
+        context.sendHtml(
             message.chat,
             welcomeMessage,
             replyMarkup = InlineKeyboardMarkup(
                 listOf(
-                    listOf(dataInlineButton("📚 Начать урок", "lesson:${user.currentLessonId}")),
-                    listOf(dataInlineButton("📝 Домашнее задание", "homework:${user.currentLessonId}")),
-                    listOf(dataInlineButton("📊 Мой прогресс", "progress"))
+                    listOf(dataInlineButton(S.btnStartLesson, "lesson:${user.currentLessonId}")),
+                    listOf(dataInlineButton(S.btnHomework, "homework:${user.currentLessonId}")),
+                    listOf(dataInlineButton(S.btnProgress, "progress")),
+                    listOf(
+                        dataInlineButton(S.btnSelectLevel, "select_level"),
+                        dataInlineButton(S.btnKnowledgeTest, "knowledge_test")
+                    ),
+                    listOf(dataInlineButton(S.btnSettings, "settings"))
                 )
             )
         )
@@ -44,106 +63,118 @@ class CommandHandler(
     suspend fun handleLesson(context: BehaviourContext, message: CommonMessage<TextContent>) {
         val from = message.from ?: return
         val user = userService.findByTelegramId(from.id.chatId.long) ?: run {
-            context.sendMessage(message.chat, Messages.NOT_REGISTERED)
+            context.sendHtml(message.chat, S.notRegistered)
             return
         }
 
         val lesson = lessonService.getLessonById(user.currentLessonId)
 
         if (lesson == null) {
-            context.sendMessage(message.chat, Messages.ALL_LESSONS_COMPLETED)
+            context.sendHtml(message.chat, S.allLessonsCompleted)
             return
         }
 
         val lessonText = buildString {
-            appendLine("📚 *Урок ${lesson.orderIndex}: ${lesson.title}*")
+            appendLine(S.lessonTitle(lesson.orderIndex, lesson.title))
             appendLine()
-            appendLine(lesson.description)
+            appendLine(lesson.description.markdownToHtml())
             appendLine()
-            appendLine("---")
+            appendLine("─────────────────────")
             appendLine()
-            appendLine(lesson.content)
+            appendLine(lesson.content.markdownToHtml())
         }
 
-        context.sendMessage(
+        context.sendHtml(
             message.chat,
             lessonText,
             replyMarkup = InlineKeyboardMarkup(
                 listOf(
-                    listOf(dataInlineButton("📖 Словарь урока", "vocabulary:${lesson.id}")),
-                    listOf(dataInlineButton("📝 Перейти к заданию", "homework:${lesson.id}"))
+                    listOf(dataInlineButton(S.btnVocabulary, "vocabulary:${lesson.id}")),
+                    listOf(dataInlineButton(S.btnGoToHomework, "homework:${lesson.id}"))
                 )
             )
         )
     }
 
     suspend fun handleHomework(context: BehaviourContext, message: CommonMessage<TextContent>) {
-        val from = message.from ?: return
-        val user = userService.findByTelegramId(from.id.chatId.long) ?: run {
-            context.sendMessage(message.chat, Messages.NOT_REGISTERED)
+        val from = message.from
+        if (from == null) {
+            return
+        }
+        val user = userService.findByTelegramId(from.id.chatId.long)
+        if (user == null) {
+            context.sendHtml(message.chat, S.notRegistered)
             return
         }
 
-        context.sendMessage(
+        context.sendHtml(
             message.chat,
-            Messages.HOMEWORK_START,
+            S.homeworkStart,
             replyMarkup = InlineKeyboardMarkup(
                 listOf(
-                    listOf(dataInlineButton("📝 Начать домашнее задание", "start_homework:${user.currentLessonId}"))
+                    listOf(dataInlineButton(S.btnStartHomework, "start_homework:${user.currentLessonId}"))
                 )
             )
         )
     }
 
     suspend fun handleProgress(context: BehaviourContext, message: CommonMessage<TextContent>) {
-        val from = message.from ?: return
-        val user = userService.findByTelegramId(from.id.chatId.long) ?: run {
-            context.sendMessage(message.chat, Messages.NOT_REGISTERED)
+        val from = message.from
+        if (from == null) {
+            return
+        }
+        val user = userService.findByTelegramId(from.id.chatId.long)
+        if (user == null) {
+            context.sendHtml(message.chat, S.notRegistered)
             return
         }
 
         val totalLessons = lessonService.getLessonsByLanguage(Language.TURKISH).size
         val completedLessons = user.currentLessonId - 1
 
-        val progressText = Messages.progress(
+        val progressText = S.progress(
             firstName = user.firstName,
             completedLessons = completedLessons,
             totalLessons = totalLessons,
             subscriptionActive = user.subscriptionActive
         )
 
-        context.sendMessage(message.chat, progressText)
+        context.sendHtml(message.chat, progressText)
     }
 
     suspend fun handleHelp(context: BehaviourContext, message: CommonMessage<TextContent>) {
-        context.sendMessage(message.chat, Messages.HELP)
+        context.sendHtml(message.chat, S.help)
     }
 
     suspend fun handleVocabulary(context: BehaviourContext, message: CommonMessage<TextContent>) {
-        val from = message.from ?: return
-        val user = userService.findByTelegramId(from.id.chatId.long) ?: run {
-            context.sendMessage(message.chat, Messages.NOT_REGISTERED)
+        val from = message.from
+        if (from == null) {
+            return
+        }
+        val user = userService.findByTelegramId(from.id.chatId.long)
+        if (user == null) {
+            context.sendHtml(message.chat, S.notRegistered)
             return
         }
 
         val vocabulary = lessonService.getVocabulary(user.currentLessonId)
 
         if (vocabulary.isEmpty()) {
-            context.sendMessage(message.chat, "Словарь для этого урока пока пуст.")
+            context.sendHtml(message.chat, S.vocabularyEmpty)
             return
         }
 
         val vocabText = buildString {
-            appendLine("📖 *Словарь урока ${user.currentLessonId}*")
+            appendLine(S.vocabularyForLesson(user.currentLessonId))
             appendLine()
             vocabulary.forEach { item ->
-                appendLine("• *${item.word}* — ${item.translation}")
-                item.pronunciation?.let { appendLine("  🔊 [$it]") }
-                item.example?.let { appendLine("  📝 _${it}_") }
+                appendLine(S.vocabularyItem(item.word, item.translation))
+                item.pronunciation?.let { appendLine(S.vocabularyPronunciation(it)) }
+                item.example?.let { appendLine(S.vocabularyExample(it)) }
                 appendLine()
             }
         }
 
-        context.sendMessage(message.chat, vocabText)
+        context.sendHtml(message.chat, vocabText)
     }
 }

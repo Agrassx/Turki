@@ -78,11 +78,14 @@ class HomeworkRepositoryImpl : HomeworkRepository {
             .map(::toSubmission)
     }
 
-    override suspend fun hasUserCompletedHomework(userId: Long, homeworkId: Int): Boolean = DatabaseFactory.dbQuery {
-        HomeworkSubmissionsTable.selectAll().where {
-            (HomeworkSubmissionsTable.userId eq userId) and (HomeworkSubmissionsTable.homeworkId eq homeworkId)
-        }.count() > 0
-    }
+    override suspend fun hasUserCompletedHomework(userId: Long, homeworkId: Int): Boolean =
+        DatabaseFactory.dbQuery {
+            HomeworkSubmissionsTable.selectAll().where {
+                (HomeworkSubmissionsTable.userId eq userId) and
+                    (HomeworkSubmissionsTable.homeworkId eq homeworkId) and
+                    (HomeworkSubmissionsTable.score eq HomeworkSubmissionsTable.maxScore)
+            }.count() > 0
+        }
 
     private fun toHomework(row: ResultRow): Homework = Homework(
         id = row[HomeworksTable.id].value,
@@ -107,7 +110,6 @@ class HomeworkRepositoryImpl : HomeworkRepository {
     private fun parseOptions(str: String): List<String> {
         if (str.isBlank()) return emptyList()
 
-        // Пробуем сначала как JSON
         return if (str.startsWith("[")) {
             try {
                 json.decodeFromString(str)
@@ -115,7 +117,6 @@ class HomeworkRepositoryImpl : HomeworkRepository {
                 str.split("|").map { it.trim() }.filter { it.isNotEmpty() }
             }
         } else {
-            // Pipe-separated формат
             str.split("|").map { it.trim() }.filter { it.isNotEmpty() }
         }
     }

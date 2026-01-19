@@ -9,13 +9,36 @@ import io.ktor.server.netty.Netty
 import kotlinx.coroutines.runBlocking
 import org.koin.core.context.startKoin
 
+/**
+ * Main entry point for the Telegram bot application.
+ *
+ * This function initializes the application and handles two modes:
+ * 1. **Import mode**: `./gradlew :bot:run --args="import [dataDir]"`
+ *    - Imports data from CSV files into the database
+ *    - Exits after import completion
+ *
+ * 2. **Bot mode**: `./gradlew :bot:run`
+ *    - Starts the Telegram bot server
+ *    - Requires BOT_TOKEN environment variable or .env file
+ *    - Initializes dependency injection (Koin)
+ *    - Seeds initial data
+ *    - Starts Ktor HTTP server with Netty engine
+ *
+ * **Environment Variables:**
+ * - `BOT_TOKEN` - Telegram bot token (required for bot mode)
+ * - `DB_PATH` - Database file path (optional, default: "data/turki.db")
+ * - `PORT` - HTTP server port (optional, default: 8080)
+ *
+ * @param args Command line arguments:
+ *             - `["import"]` - Run in import mode
+ *             - `["import", "dataDir"]` - Import from specific directory
+ *             - `[]` - Run in bot mode
+ */
 fun main(args: Array<String>) {
-    // Загружаем .env файл
     EnvLoader.load()
 
     val dbPath = EnvLoader.get("DB_PATH", "data/turki.db")!!
 
-    // Режим импорта данных
     if (args.isNotEmpty() && args[0] == "import") {
         DatabaseFactory.init(dbPath)
         val dataDir = args.getOrNull(1) ?: "data"
@@ -23,7 +46,6 @@ fun main(args: Array<String>) {
         return
     }
 
-    // Проверяем наличие токена
     val botToken = EnvLoader.get("BOT_TOKEN")
     if (botToken.isNullOrBlank()) {
         println("""
@@ -41,7 +63,6 @@ fun main(args: Array<String>) {
         return
     }
 
-    // Обычный запуск бота
     DatabaseFactory.init(dbPath)
 
     startKoin {
@@ -56,6 +77,16 @@ fun main(args: Array<String>) {
         .start(wait = true)
 }
 
+/**
+ * Ktor application module configuration.
+ *
+ * This function configures the Ktor application by:
+ * - Setting up the Telegram bot with command and callback handlers
+ * - Configuring HTTP routing
+ * - Seeding initial database data (lessons, vocabulary, homework)
+ *
+ * This is called automatically by Ktor when the server starts.
+ */
 fun Application.module() {
     configureBot()
     configureRouting()

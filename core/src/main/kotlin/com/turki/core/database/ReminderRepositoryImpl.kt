@@ -3,7 +3,7 @@ package com.turki.core.database
 import com.turki.core.domain.Reminder
 import com.turki.core.domain.ReminderType
 import com.turki.core.repository.ReminderRepository
-import kotlin.time.Instant
+import kotlinx.datetime.Instant
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and

@@ -15,7 +15,9 @@ private val homeworkService: HomeworkService by inject(HomeworkService::class.ja
 
 suspend fun seedInitialData() {
     val existingLessons = lessonService.getAllLessons()
-    if (existingLessons.isNotEmpty()) return
+    if (existingLessons.isNotEmpty()) {
+        return
+    }
 
     val lessons = listOf(
         createLesson1(),

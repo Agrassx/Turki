@@ -2,9 +2,7 @@ version: '3.8'
 
 services:
   bot:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/${GITHUB_REPOSITORY:-user/repo}:${VERSION:-latest}
     container_name: turki-bot
     restart: unless-stopped
     environment:
@@ -16,7 +14,25 @@ services:
     ports:
       - "8080:8080"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  admin:
+    image: ghcr.io/${GITHUB_REPOSITORY:-user/repo}-admin:${VERSION:-latest}
+    container_name: turki-admin
+    restart: unless-stopped
+    environment:
+      - DB_PATH=/app/data/turki.db
+      - ADMIN_PORT=8081
+    volumes:
+      - turki-data:/app/data
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/health"]
       interval: 30s
       timeout: 10s
       retries: 3
