@@ -1,0 +1,13 @@
+lesson_order_index,question_type,question_text,options,correct_answer
+1,MULTIPLE_CHOICE,"Как сказать ""Доброе утро"" по-турецки?","Merhaba|Günaydın|İyi akşamlar|Hoşça kal",Günaydın
+1,MULTIPLE_CHOICE,"Что означает ""Nasılsınız""?","Как вас зовут?|Как дела?|Откуда вы?|Сколько лет?",Как дела?
+1,TRANSLATION,"Переведите на турецкий: ""Привет""","",Merhaba
+1,MULTIPLE_CHOICE,"Как представиться по-турецки?","Sen Ali|Ben Ali|Ali sen|Ali ben",Ben Ali
+2,MULTIPLE_CHOICE,"Как по-турецки ""пять""?","dört|beş|altı|yedi",beş
+2,MULTIPLE_CHOICE,"Что означает ""sekiz""?","шесть|семь|восемь|девять",восемь
+2,TRANSLATION,"Напишите число 3 по-турецки","",üç
+2,MULTIPLE_CHOICE,"Как спросить ""Сколько?""?","Ne?|Kaç?|Kim?|Nerede?",Kaç?
+3,MULTIPLE_CHOICE,"Как сказать ""Спасибо"" по-турецки?","Rica ederim|Lütfen|Teşekkürler|Affedersiniz",Teşekkürler
+3,MULTIPLE_CHOICE,"Что означает ""Lütfen""?","Спасибо|Пожалуйста (просьба)|Извините|Да",Пожалуйста (просьба)
+3,TRANSLATION,"Переведите: ""Да""","",Evet
+3,MULTIPLE_CHOICE,"Как ответить на ""Teşekkürler""?","Evet|Hayır|Rica ederim|Tamam",Rica ederim
