@@ -18,7 +18,10 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.coroutines.delay
 import org.koin.java.KoinJavaComponent.inject
+import org.slf4j.LoggerFactory
 import kotlin.time.Duration.Companion.minutes
+
+private val logger = LoggerFactory.getLogger("ReminderScheduler")
 
 private val reminderService: ReminderService by inject(ReminderService::class.java)
 private val userService: UserService by inject(UserService::class.java)
@@ -48,14 +51,14 @@ suspend fun startReminderScheduler(bot: TelegramBot) {
                     )
                     reminderService.markReminderAsSent(reminder.id)
                 } catch (e: Exception) {
-                    println("Failed to send reminder to user ${user.telegramId}: ${e.message}")
+                    logger.warn("Failed to send reminder to user: ${e.message}")
                 }
             }
 
             sendScheduledReminders(bot)
             sendWeeklyReports(bot)
         } catch (e: Exception) {
-            println("Error in reminder scheduler: ${e.message}")
+            logger.error("Error in reminder scheduler: ${e.message}")
         }
 
         delay(1.minutes)

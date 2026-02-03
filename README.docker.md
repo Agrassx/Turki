@@ -7,10 +7,22 @@
 Создайте файл `.env`:
 
 ```env
-GITHUB_REPOSITORY=your-username/turki
-VERSION=main-abc1234
+# Required
 BOT_TOKEN=your_bot_token
+DB_PASSWORD=your_secure_db_password
+ADMIN_PASSWORD=your_secure_admin_password
+
+# Optional
+GITHUB_REPOSITORY=your-username/turki
+VERSION=latest
+DB_USER=turki
+ADMIN_USER=admin
 ```
+
+**Обязательные переменные:**
+- `BOT_TOKEN` - токен Telegram бота от @BotFather
+- `DB_PASSWORD` - пароль для PostgreSQL
+- `ADMIN_PASSWORD` - пароль для доступа к админ-панели
 
 ### Авторизация в GitHub Container Registry
 

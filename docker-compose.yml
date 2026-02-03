@@ -1,14 +1,12 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
     container_name: turki-postgres
     restart: unless-stopped
     environment:
-      - POSTGRES_DB=turki
-      - POSTGRES_USER=turki
-      - POSTGRES_PASSWORD=turki
+      POSTGRES_DB: turki
+      POSTGRES_USER: ${DB_USER:-turki}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
     volumes:
       - turki-postgres-data:/var/lib/postgresql/data
     ports:
@@ -19,11 +17,11 @@ services:
     container_name: turki-bot
     restart: unless-stopped
     environment:
-      - BOT_TOKEN=${BOT_TOKEN}
-      - DB_URL=jdbc:postgresql://postgres:5432/turki
-      - DB_USER=turki
-      - DB_PASSWORD=turki
-      - PORT=8080
+      BOT_TOKEN: ${BOT_TOKEN:?BOT_TOKEN is required}
+      DB_URL: jdbc:postgresql://postgres:5432/turki
+      DB_USER: ${DB_USER:-turki}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      PORT: 8080
     depends_on:
       - postgres
     ports:
@@ -40,10 +38,12 @@ services:
     container_name: turki-admin
     restart: unless-stopped
     environment:
-      - DB_URL=jdbc:postgresql://postgres:5432/turki
-      - DB_USER=turki
-      - DB_PASSWORD=turki
-      - ADMIN_PORT=8081
+      DB_URL: jdbc:postgresql://postgres:5432/turki
+      DB_USER: ${DB_USER:-turki}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      ADMIN_PORT: 8081
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
     depends_on:
       - postgres
     ports:

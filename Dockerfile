@@ -28,10 +28,9 @@ COPY --from=build /app/bot/build/libs/*.jar /app/bot.jar
 
 EXPOSE 8080
 
-ENV BOT_TOKEN=""
+# Non-sensitive defaults only. Secrets (BOT_TOKEN, DB_PASSWORD) must be passed at runtime.
 ENV DB_URL="jdbc:postgresql://postgres:5432/turki"
 ENV DB_USER="turki"
-ENV DB_PASSWORD="turki"
 ENV PORT="8080"
 
 ENTRYPOINT ["java", "-jar", "/app/bot.jar"]

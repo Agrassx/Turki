@@ -27,9 +27,9 @@ COPY --from=build /app/admin/build/libs/admin-web.jar /app/admin.jar
 
 EXPOSE 8081
 
+# Non-sensitive defaults only. Secrets (DB_PASSWORD) must be passed at runtime.
 ENV DB_URL="jdbc:postgresql://postgres:5432/turki"
 ENV DB_USER="turki"
-ENV DB_PASSWORD="turki"
 ENV ADMIN_PORT="8081"
 
 ENTRYPOINT ["java", "-jar", "/app/admin.jar"]

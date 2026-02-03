@@ -5,6 +5,7 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.slf4j.LoggerFactory
 
 /**
  * Factory object for database initialization and connection management.
@@ -25,6 +26,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
  * - RemindersTable - Scheduled reminders for users
  */
 object DatabaseFactory {
+    private val logger = LoggerFactory.getLogger(DatabaseFactory::class.java)
 
     /**
      * Initializes the database connection and creates all required tables.
@@ -52,9 +54,10 @@ object DatabaseFactory {
     fun init(dbUrl: String? = null, dbUser: String? = null, dbPassword: String? = null) {
         val url = dbUrl ?: System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5432/turki"
         val user = dbUser ?: System.getenv("DB_USER") ?: "turki"
-        val password = dbPassword ?: System.getenv("DB_PASSWORD") ?: "turki"
+        val password = dbPassword ?: System.getenv("DB_PASSWORD")
+            ?: error("DB_PASSWORD environment variable is required")
 
-        println("📦 База данных: $url")
+        logger.info("Connecting to database: $url")
 
         Database.connect(
             url = url,

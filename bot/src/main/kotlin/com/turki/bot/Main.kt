@@ -8,6 +8,9 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import kotlinx.coroutines.runBlocking
 import org.koin.core.context.startKoin
+import org.slf4j.LoggerFactory
+
+private val logger = LoggerFactory.getLogger("TurkiBot")
 
 /**
  * Main entry point for the Telegram bot application.
@@ -28,7 +31,7 @@ import org.koin.core.context.startKoin
  * - `BOT_TOKEN` - Telegram bot token (required for bot mode)
  * - `DB_URL` - Postgres JDBC URL (optional, default: "jdbc:postgresql://localhost:5432/turki")
  * - `DB_USER` - Postgres user (optional, default: "turki")
- * - `DB_PASSWORD` - Postgres password (optional, default: "turki")
+ * - `DB_PASSWORD` - Postgres password (required)
  * - `PORT` - HTTP server port (optional, default: 8080)
  *
  * @param args Command line arguments:
@@ -41,7 +44,7 @@ fun main(args: Array<String>) {
 
     val dbUrl = EnvLoader.get("DB_URL", "jdbc:postgresql://localhost:5432/turki")
     val dbUser = EnvLoader.get("DB_USER", "turki")
-    val dbPassword = EnvLoader.get("DB_PASSWORD", "turki")
+    val dbPassword = EnvLoader.require("DB_PASSWORD")
 
     if (args.isNotEmpty() && args[0] == "import") {
         DatabaseFactory.init(dbUrl, dbUser, dbPassword)
@@ -52,16 +55,16 @@ fun main(args: Array<String>) {
 
     val botToken = EnvLoader.get("BOT_TOKEN")
     if (botToken.isNullOrBlank()) {
-        println("""
-            ❌ BOT_TOKEN не найден!
+        logger.error("""
+            BOT_TOKEN not found!
             
-            Создайте файл .env в корне проекта:
+            Create .env file in project root:
             
-            echo "BOT_TOKEN=ваш_токен_от_BotFather" > .env
+            echo "BOT_TOKEN=your_token_from_BotFather" > .env
             
-            Или экспортируйте переменную:
+            Or export the variable:
             
-            export BOT_TOKEN=ваш_токен_от_BotFather
+            export BOT_TOKEN=your_token_from_BotFather
             ./gradlew :bot:run
         """.trimIndent())
         return
@@ -75,7 +78,7 @@ fun main(args: Array<String>) {
 
     val port = EnvLoader.get("PORT", "8080")!!.toInt()
 
-    println("🚀 Запуск Turki Bot на порту $port...")
+    logger.info("Starting Turki Bot on port $port...")
 
     embeddedServer(Netty, port = port, module = Application::module)
         .start(wait = true)

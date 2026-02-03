@@ -42,6 +42,8 @@ kotlin {
             implementation(libs.bundles.ktor.server)
             implementation("io.ktor:ktor-server-content-negotiation:${libs.versions.ktor.get()}")
             implementation("io.ktor:ktor-serialization-kotlinx-json:${libs.versions.ktor.get()}")
+            implementation("io.ktor:ktor-server-auth:${libs.versions.ktor.get()}")
+            implementation("io.ktor:ktor-server-cors:${libs.versions.ktor.get()}")
             implementation(libs.bundles.ktor.client)
             implementation(libs.ktor.serialization.json)
             implementation(libs.koin.compose)

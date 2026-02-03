@@ -16,7 +16,8 @@ fun main() = application {
 
     val dbUrl = System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5432/turki"
     val dbUser = System.getenv("DB_USER") ?: "turki"
-    val dbPassword = System.getenv("DB_PASSWORD") ?: "turki"
+    val dbPassword = System.getenv("DB_PASSWORD")
+        ?: error("DB_PASSWORD environment variable is required")
     DatabaseFactory.init(dbUrl, dbUser, dbPassword)
 
     Window(
