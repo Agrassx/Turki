@@ -103,14 +103,13 @@ object ImportData {
     }
 
     private fun importLessons(file: File, lessonIdMap: MutableMap<Int, Int>) {
-        val lines = file.readLines().drop(1)
+        val records = readCsvRecords(file).drop(1)
         var imported = 0
         var updated = 0
 
         transaction {
-            for (line in lines) {
+            for (fields in records) {
                 try {
-                    val fields = parseCsvLine(line)
                     if (fields.size < 5) continue
 
                     val orderIndex = fields[0].toIntOrNull() ?: continue
@@ -118,6 +117,9 @@ object ImportData {
                     val title = fields[2]
                     val description = fields[3].markdownToHtml()
                     val content = fields[4].markdownToHtml()
+                    val level = fields.getOrNull(5)?.takeIf { it.isNotBlank() } ?: "A1"
+                    val contentVersion = fields.getOrNull(6)?.takeIf { it.isNotBlank() } ?: "v1"
+                    val isActive = fields.getOrNull(7)?.toBooleanStrictOrNull() ?: true
 
                     val existing = LessonsTable.selectAll()
                         .where {
@@ -137,6 +139,9 @@ object ImportData {
                             it[LessonsTable.title] = title
                             it[LessonsTable.description] = description
                             it[LessonsTable.content] = content
+                            it[LessonsTable.level] = level
+                            it[LessonsTable.contentVersion] = contentVersion
+                            it[LessonsTable.isActive] = isActive
                         }
                         updated++
                         existingId
@@ -147,6 +152,9 @@ object ImportData {
                             it[LessonsTable.title] = title
                             it[LessonsTable.description] = description
                             it[LessonsTable.content] = content
+                            it[LessonsTable.level] = level
+                            it[LessonsTable.contentVersion] = contentVersion
+                            it[LessonsTable.isActive] = isActive
                         }[LessonsTable.id].value
                     }
 
@@ -162,13 +170,12 @@ object ImportData {
     }
 
     private fun importVocabulary(file: File, lessonIdMap: Map<Int, Int>) {
-        val lines = file.readLines().drop(1)
+        val records = readCsvRecords(file).drop(1)
         var imported = 0
 
         transaction {
-            for (line in lines) {
+            for (fields in records) {
                 try {
-                    val fields = parseCsvLine(line)
                     if (fields.size < 3) continue
 
                     val lessonOrderIndex = fields[0].toIntOrNull() ?: continue
@@ -196,7 +203,7 @@ object ImportData {
     }
 
     private fun importHomework(file: File, lessonIdMap: Map<Int, Int>) {
-        val lines = file.readLines().drop(1)
+        val records = readCsvRecords(file).drop(1)
         var importedQuestions = 0
         val homeworkIdMap = mutableMapOf<Int, Int>()
 
@@ -214,9 +221,8 @@ object ImportData {
                 }
             }
 
-            for (line in lines) {
+            for (fields in records) {
                 try {
-                    val fields = parseCsvLine(line)
                     if (fields.size < 5) continue
 
                     val lessonOrderIndex = fields[0].toIntOrNull() ?: continue
@@ -285,68 +291,50 @@ object ImportData {
             ?: File(dataDir)
     }
 
-    /**
-     * Parses a CSV line with proper handling of quoted fields.
-     *
-     * This function correctly handles:
-     * - Fields enclosed in double quotes
-     * - Escaped quotes (double quotes inside quoted fields)
-     * - Commas inside quoted fields
-     * - Empty fields
-     *
-     * **Regular Expression Pattern:**
-     * The parsing uses character-by-character analysis rather than regex
-     * to properly handle edge cases in CSV format.
-     *
-     * **Examples:**
-     * ```
-     * Input:  "field1","field2,with,commas","field3"
-     * Output: ["field1", "field2,with,commas", "field3"]
-     *
-     * Input:  "field1","field2""with""quotes","field3"
-     * Output: ["field1", "field2\"with\"quotes", "field3"]
-     *
-     * Input:  field1,field2,field3
-     * Output: ["field1", "field2", "field3"]
-     * ```
-     *
-     * @param line A single line from a CSV file
-     * @return List of parsed field values
-     */
-    private fun parseCsvLine(line: String): List<String> {
-        val result = mutableListOf<String>()
-        val current = StringBuilder()
+    private fun readCsvRecords(file: File): List<List<String>> {
+        val records = mutableListOf<List<String>>()
+        val currentRecord = mutableListOf<String>()
+        val currentField = StringBuilder()
         var inQuotes = false
+
+        val text = file.readText()
         var i = 0
-
-        while (i < line.length) {
-            val char = line[i]
-
+        while (i < text.length) {
+            val char = text[i]
             when {
-                char == '"' && !inQuotes -> {
-                    inQuotes = true
-                }
-                char == '"' && inQuotes -> {
-                    if (i + 1 < line.length && line[i + 1] == '"') {
-                        current.append('"')
+                char == '"' -> {
+                    if (inQuotes && i + 1 < text.length && text[i + 1] == '"') {
+                        currentField.append('"')
                         i++
                     } else {
-                        inQuotes = false
+                        inQuotes = !inQuotes
                     }
                 }
                 char == ',' && !inQuotes -> {
-                    result.add(current.toString())
-                    current.clear()
+                    currentRecord.add(currentField.toString())
+                    currentField.clear()
                 }
-                else -> {
-                    current.append(char)
+                (char == '\n' || char == '\r') && !inQuotes -> {
+                    currentRecord.add(currentField.toString())
+                    currentField.clear()
+                    if (currentRecord.isNotEmpty()) {
+                        records.add(currentRecord.toList())
+                        currentRecord.clear()
+                    }
+                    if (char == '\r' && i + 1 < text.length && text[i + 1] == '\n') {
+                        i++
+                    }
                 }
+                else -> currentField.append(char)
             }
             i++
         }
 
-        result.add(current.toString())
-        return result
+        if (currentField.isNotEmpty() || currentRecord.isNotEmpty()) {
+            currentRecord.add(currentField.toString())
+            records.add(currentRecord.toList())
+        }
+
+        return records
     }
 }
-

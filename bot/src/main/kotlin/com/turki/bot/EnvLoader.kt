@@ -30,7 +30,8 @@ object EnvLoader {
     }
 
     fun require(key: String): String {
-        return get(key) ?: error("❌ Переменная окружения $key не задана! Создайте .env файл или экспортируйте переменную.")
+        return get(key)
+            ?: error("❌ Переменная окружения $key не задана! Создайте .env файл или экспортируйте переменную.")
     }
 
     private fun findEnvFile(): File? {

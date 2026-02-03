@@ -73,4 +73,12 @@ interface HomeworkRepository {
      * @return true if the user has completed the homework, false otherwise
      */
     suspend fun hasUserCompletedHomework(userId: Long, homeworkId: Int): Boolean
+
+    /**
+     * Deletes all homework submissions for a specific user.
+     *
+     * @param userId The user's database ID
+     * @return true if any submissions were deleted, false otherwise
+     */
+    suspend fun deleteSubmissionsByUser(userId: Long): Boolean
 }

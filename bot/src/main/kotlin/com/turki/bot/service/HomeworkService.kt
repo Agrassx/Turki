@@ -3,6 +3,7 @@ package com.turki.bot.service
 import com.turki.core.domain.Homework
 import com.turki.core.domain.HomeworkQuestion
 import com.turki.core.domain.HomeworkSubmission
+import com.turki.core.domain.QuestionType
 import com.turki.core.repository.HomeworkRepository
 import com.turki.core.repository.UserRepository
 import kotlinx.datetime.Clock
@@ -69,9 +70,7 @@ class HomeworkService(
         var score = 0
 
         questions.forEach { question ->
-            val userAnswer = answers[question.id]?.trim()?.lowercase()
-            val correctAnswer = question.correctAnswer.trim().lowercase()
-            if (userAnswer == correctAnswer) {
+            if (isAnswerCorrect(question, answers[question.id])) {
                 score++
             }
         }
@@ -125,4 +124,35 @@ class HomeworkService(
      */
     suspend fun createHomework(homework: Homework): Homework =
         homeworkRepository.create(homework)
+
+    fun isAnswerCorrect(question: HomeworkQuestion, answer: String?): Boolean {
+        if (answer.isNullOrBlank()) {
+            return false
+        }
+        val normalizedUser = normalizeAnswer(answer)
+        val normalizedCorrect = normalizeAnswer(question.correctAnswer)
+        if (normalizedUser.isBlank()) {
+            return false
+        }
+
+        val allowPrefix = question.questionText.contains("начните", ignoreCase = true) ||
+            question.questionText.contains("benim", ignoreCase = true) ||
+            normalizedCorrect == "benim adım"
+
+        return if (
+            allowPrefix &&
+            (question.questionType == QuestionType.TEXT_INPUT || question.questionType == QuestionType.TRANSLATION)
+        ) {
+            normalizedUser.startsWith(normalizedCorrect)
+        } else {
+            normalizedUser == normalizedCorrect
+        }
+    }
+
+    private fun normalizeAnswer(text: String): String {
+        return text.lowercase()
+            .replace(Regex("[\\p{P}\\p{S}]+"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
 }

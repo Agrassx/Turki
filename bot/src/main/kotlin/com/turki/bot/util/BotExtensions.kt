@@ -4,7 +4,9 @@ import dev.inmo.tgbotapi.extensions.api.send.sendMessage
 import dev.inmo.tgbotapi.extensions.behaviour_builder.BehaviourContext
 import dev.inmo.tgbotapi.types.ChatIdentifier
 import dev.inmo.tgbotapi.types.IdChatIdentifier
-import dev.inmo.tgbotapi.types.buttons.InlineKeyboardMarkup
+import dev.inmo.tgbotapi.types.buttons.KeyboardMarkup
+import dev.inmo.tgbotapi.types.buttons.ReplyKeyboardMarkup
+import dev.inmo.tgbotapi.types.buttons.SimpleKeyboardButton
 import dev.inmo.tgbotapi.types.chat.Chat
 import dev.inmo.tgbotapi.types.chat.User
 import dev.inmo.tgbotapi.types.message.HTMLParseMode
@@ -130,7 +132,7 @@ fun String.markdownToHtml(): String {
  * @param chat The chat or user to send the message to. Can be [Chat], [User],
  *              [ChatIdentifier], or [IdChatIdentifier]
  * @param text The message text with HTML formatting
- * @param replyMarkup Optional inline keyboard markup for interactive buttons
+ * @param replyMarkup Optional reply markup for interactive buttons
  *
  * @sample
  * ```
@@ -144,12 +146,27 @@ fun String.markdownToHtml(): String {
 suspend fun BehaviourContext.sendHtml(
     chat: Any,
     text: String,
-    replyMarkup: InlineKeyboardMarkup? = null
+    replyMarkup: KeyboardMarkup? = null
 ) {
+    val markup = replyMarkup ?: mainCommandKeyboard()
     sendMessage(
         chatId = chat.toChatId(),
         text = text,
         parseMode = HTMLParseMode,
-        replyMarkup = replyMarkup
+        replyMarkup = markup
     )
 }
+
+fun mainCommandKeyboard(): ReplyKeyboardMarkup = ReplyKeyboardMarkup(
+    keyboard = listOf(
+        listOf(
+            SimpleKeyboardButton("/start"),
+            SimpleKeyboardButton("/menu"),
+            SimpleKeyboardButton("/help")
+        )
+    ),
+    resizeKeyboard = true,
+    oneTimeKeyboard = false,
+    selective = false,
+    persistent = true
+)

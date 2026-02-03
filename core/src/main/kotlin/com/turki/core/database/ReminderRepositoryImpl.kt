@@ -60,6 +60,10 @@ class ReminderRepositoryImpl : ReminderRepository {
         } > 0
     }
 
+    override suspend fun deleteByUser(userId: Long): Boolean = DatabaseFactory.dbQuery {
+        RemindersTable.deleteWhere { RemindersTable.userId eq userId } > 0
+    }
+
     private fun toReminder(row: ResultRow): Reminder = Reminder(
         id = row[RemindersTable.id].value,
         userId = row[RemindersTable.userId].value,

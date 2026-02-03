@@ -1,10 +1,21 @@
 package com.turki.bot.handler
 
 import com.turki.bot.i18n.S
+import com.turki.bot.service.AnalyticsService
+import com.turki.bot.service.DictionaryService
+import com.turki.bot.service.ExerciseService
 import com.turki.bot.service.HomeworkService
 import com.turki.bot.service.LessonService
+import com.turki.bot.service.ProgressService
 import com.turki.bot.service.ReminderService
+import com.turki.bot.service.ReminderPreferenceService
+import com.turki.bot.service.ReviewService
 import com.turki.bot.service.UserService
+import com.turki.bot.service.UserStateService
+import com.turki.bot.service.UserFlowState
+import com.turki.bot.service.UserDataService
+import com.turki.bot.service.ExerciseFlowPayload
+import com.turki.bot.service.ReviewFlowPayload
 import com.turki.bot.util.markdownToHtml
 import com.turki.bot.util.sendHtml
 import com.turki.core.domain.Language
@@ -14,6 +25,8 @@ import dev.inmo.tgbotapi.extensions.behaviour_builder.BehaviourContext
 import dev.inmo.tgbotapi.types.buttons.InlineKeyboardMarkup
 import dev.inmo.tgbotapi.types.buttons.inline.dataInlineButton
 import dev.inmo.tgbotapi.types.queries.callback.DataCallbackQuery
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 
 /**
  * Handler for Telegram bot inline callback queries.
@@ -39,8 +52,17 @@ class CallbackHandler(
     private val userService: UserService,
     private val lessonService: LessonService,
     private val homeworkService: HomeworkService,
-    private val reminderService: ReminderService
+    private val reminderService: ReminderService,
+    private val userStateService: UserStateService,
+    private val exerciseService: ExerciseService,
+    private val progressService: ProgressService,
+    private val dictionaryService: DictionaryService,
+    private val reviewService: ReviewService,
+    private val reminderPreferenceService: ReminderPreferenceService,
+    private val analyticsService: AnalyticsService,
+    private val userDataService: UserDataService
 ) {
+    private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
 
     suspend fun handleCallback(context: BehaviourContext, query: DataCallbackQuery) {
         val data = query.data
@@ -51,7 +73,15 @@ class CallbackHandler(
 
         when (action) {
             "lesson" -> handleLessonCallback(context, query, parts.getOrNull(1)?.toIntOrNull())
+            "lesson_start" -> handleLessonStart(context, query, parts.getOrNull(1)?.toIntOrNull())
+            "lesson_practice" -> handleLessonPractice(context, query, parts.getOrNull(1)?.toIntOrNull())
+            "lessons_list" -> handleLessonsList(context, query, parts.getOrNull(1)?.toIntOrNull() ?: 0)
             "vocabulary" -> handleVocabularyCallback(context, query, parts.getOrNull(1)?.toIntOrNull())
+            "vocab_list" -> handleVocabularyList(context, query, parts.getOrNull(1)?.toIntOrNull())
+            "vocab_word" -> handleVocabularyWord(context, query, parts.getOrNull(1)?.toIntOrNull(), parts.getOrNull(2)?.toIntOrNull())
+            "vocab_add_all" -> handleVocabularyAddAll(context, query, parts.getOrNull(1)?.toIntOrNull())
+            "vocab_add" -> handleVocabularyAdd(context, query, parts.getOrNull(1)?.toIntOrNull(), parts.getOrNull(2)?.toIntOrNull())
+            "vocab_remove" -> handleVocabularyRemove(context, query, parts.getOrNull(1)?.toIntOrNull(), parts.getOrNull(2)?.toIntOrNull())
             "homework" -> handleHomeworkCallback(context, query, parts.getOrNull(1)?.toIntOrNull())
             "start_homework" -> handleStartHomework(context, query, parts.getOrNull(1)?.toIntOrNull())
             "answer" -> handleAnswer(context, query, parts)
@@ -61,10 +91,31 @@ class CallbackHandler(
             "settings" -> handleSettings(context, query)
             "reset_progress" -> handleResetProgress(context, query)
             "confirm_reset" -> handleConfirmReset(context, query)
+            "confirm_delete" -> handleConfirmDelete(context, query)
             "select_level" -> handleSelectLevel(context, query)
             "set_level" -> handleSetLevel(context, query, parts.getOrNull(1))
             "knowledge_test" -> handleKnowledgeTest(context, query)
             "back_to_menu" -> handleBackToMenu(context, query)
+            "continue" -> handleContinue(context, query)
+            "practice_start" -> handlePracticeStart(context, query)
+            "exercise_answer" -> handleExerciseAnswer(context, query, parts)
+            "exercise_add_dict" -> handleExerciseAddDictionary(context, query, parts.getOrNull(1)?.toIntOrNull())
+            "exercise_next" -> handleExerciseNext(context, query)
+            "dictionary_prompt" -> handleDictionaryPrompt(context, query)
+            "dict_list" -> handleDictionaryList(context, query, parts.getOrNull(1)?.toIntOrNull() ?: 0)
+            "dict_fav" -> handleDictionaryFavorite(context, query, parts.getOrNull(1)?.toIntOrNull())
+            "dict_tags" -> handleDictionaryTags(context, query, parts.getOrNull(1)?.toIntOrNull())
+            "dict_tag" -> handleDictionaryTagToggle(context, query, parts)
+            "dict_add_custom" -> handleDictionaryAddCustom(context, query)
+            "review_start" -> handleReviewStart(context, query)
+            "review_answer" -> handleReviewAnswer(context, query, parts)
+            "hw_next" -> handleHomeworkNext(context, query, parts)
+            "hw_add_dict" -> handleHomeworkAddDictionary(context, query, parts)
+            "reminders" -> handleReminders(context, query)
+            "reminder_enable_weekdays" -> handleReminderEnableWeekdays(context, query)
+            "reminder_disable" -> handleReminderDisable(context, query)
+            "help" -> handleHelp(context, query)
+            "next_homework" -> handleNextHomework(context, query, parts.getOrNull(1)?.toIntOrNull())
         }
     }
 
@@ -99,13 +150,108 @@ class CallbackHandler(
                 listOf(
                     listOf(dataInlineButton(S.btnVocabulary, "vocabulary:${lesson.id}")),
                     listOf(dataInlineButton(S.btnGoToHomework, "homework:${lesson.id}")),
+                    listOf(dataInlineButton(S.btnStartPractice, "lesson_practice:${lesson.id}")),
                     listOf(dataInlineButton(S.btnSetReminder, "set_reminder"))
                 )
             )
         )
     }
 
+    private suspend fun handleLessonsList(context: BehaviourContext, query: DataCallbackQuery, page: Int) {
+        val lessons = lessonService.getLessonsByLanguage(Language.TURKISH)
+        val user = userService.findByTelegramId(query.from.id.chatId.long)
+        val completed = if (user != null) progressService.getCompletedLessonIds(user.id) else emptySet()
+        val perPage = 5
+        val totalPages = (lessons.size + perPage - 1) / perPage
+        val safePage = page.coerceIn(0, maxOf(totalPages - 1, 0))
+        val pageLessons = lessons.drop(safePage * perPage).take(perPage)
+
+        val buttons = pageLessons.map { lesson ->
+            val topic = extractLessonTopic(lesson.title)
+            val label = if (completed.contains(lesson.id)) {
+                "${S.btnLesson} ${lesson.orderIndex} · $topic ✅"
+            } else {
+                "${S.btnLesson} ${lesson.orderIndex} · $topic"
+            }
+            listOf(dataInlineButton(label, "lesson_start:${lesson.id}"))
+        }.toMutableList()
+
+        if (totalPages > 1) {
+            val nav = buildList {
+                if (safePage > 0) add(dataInlineButton("◀️", "lessons_list:${safePage - 1}"))
+                if (safePage < totalPages - 1) add(dataInlineButton("▶️", "lessons_list:${safePage + 1}"))
+            }
+            if (nav.isNotEmpty()) {
+                buttons.add(nav)
+            }
+        }
+
+        context.sendHtml(
+            query.from,
+            if (totalPages > 1) "${S.lessonsTitle}\n\nСтраница ${safePage + 1}/$totalPages" else S.lessonsTitle,
+            replyMarkup = InlineKeyboardMarkup(
+                buttons + listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
+            )
+        )
+        if (user != null) {
+            analyticsService.log("lesson_list_opened", user.id)
+        }
+    }
+
+    private fun extractLessonTopic(title: String): String {
+        val first = title.trim().split(Regex("\\s+")).firstOrNull().orEmpty()
+        val cleaned = first.trim { ch -> !ch.isLetterOrDigit() }
+        return if (cleaned.isNotBlank()) cleaned else title.take(20)
+    }
+
+    private suspend fun handleLessonStart(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        lessonId: Int?
+    ) {
+        if (lessonId == null) {
+            return
+        }
+        val lesson = lessonService.getLessonById(lessonId) ?: run {
+            context.sendHtml(query.from, S.lessonNotFound)
+            return
+        }
+
+        val introText = buildString {
+            appendLine(S.lessonIntroTitle(lesson.orderIndex, lesson.title))
+            appendLine()
+            appendLine(lesson.description.markdownToHtml())
+            appendLine()
+            appendLine("─────────────────────")
+            appendLine()
+            appendLine(lesson.content.markdownToHtml())
+        }
+
+        context.sendHtml(
+            query.from,
+            introText,
+            replyMarkup = InlineKeyboardMarkup(
+                listOf(
+                    listOf(dataInlineButton(S.btnVocabulary, "vocabulary:${lesson.id}")),
+                    listOf(dataInlineButton(S.btnGoToHomework, "homework:${lesson.id}")),
+                    listOf(dataInlineButton(S.btnStartPractice, "lesson_practice:${lesson.id}"))
+                )
+            )
+        )
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        progressService.markLessonStarted(user.id, lesson.id)
+        analyticsService.log("lesson_opened", user.id, props = mapOf("lessonId" to lesson.id.toString()))
+    }
+
     private suspend fun handleVocabularyCallback(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        lessonId: Int?
+    ) {
+        handleVocabularyList(context, query, lessonId)
+    }
+
+    private suspend fun handleVocabularyList(
         context: BehaviourContext,
         query: DataCallbackQuery,
         lessonId: Int?
@@ -115,30 +261,522 @@ class CallbackHandler(
         }
 
         val vocabulary = lessonService.getVocabulary(lessonId)
-
         if (vocabulary.isEmpty()) {
             context.sendHtml(query.from, S.vocabularyEmpty)
             return
         }
 
-        val vocabText = buildString {
-            appendLine(S.vocabularyTitle)
-            appendLine()
-            vocabulary.forEach { item ->
-                appendLine(S.vocabularyItem(item.word, item.translation))
-                item.pronunciation?.let { appendLine(S.vocabularyPronunciation(it)) }
-                item.example?.let { appendLine(S.vocabularyExample(it)) }
-                appendLine()
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val favorites = dictionaryService.listFavoriteIds(user.id)
+
+        val buttons = vocabulary.map { item ->
+            val label = if (favorites.contains(item.id)) "⭐️ ${item.word}" else item.word
+            listOf(dataInlineButton(label, "vocab_word:$lessonId:${item.id}"))
+        }.toMutableList()
+
+        buttons.add(listOf(dataInlineButton(S.btnAddAllToDictionary, "vocab_add_all:$lessonId")))
+        buttons.add(listOf(dataInlineButton(S.btnBack, "lesson_start:$lessonId")))
+
+        context.sendHtml(
+            query.from,
+            S.vocabularyForLesson(lessonId),
+            replyMarkup = InlineKeyboardMarkup(buttons)
+        )
+    }
+
+    private suspend fun handleVocabularyWord(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        lessonId: Int?,
+        vocabId: Int?
+    ) {
+        if (lessonId == null || vocabId == null) {
+            return
+        }
+        val vocab = lessonService.findVocabularyById(vocabId) ?: return
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val entry = dictionaryService.getEntry(user.id, vocabId)
+        val isFavorite = entry?.isFavorite == true
+
+        val text = buildString {
+            appendLine(S.vocabularyWordTitle(vocab.word, vocab.translation))
+            vocab.pronunciation?.let { appendLine(S.vocabularyPronunciation(it)) }
+            vocab.example?.let { appendLine(S.vocabularyExample(it)) }
+        }
+
+        val buttons = buildList {
+            if (isFavorite) {
+                add(listOf(dataInlineButton(S.btnRemoveFromDictionary, "vocab_remove:$lessonId:$vocabId")))
+            } else {
+                add(listOf(dataInlineButton(S.btnAddToDictionary, "vocab_add:$lessonId:$vocabId")))
             }
+            add(listOf(dataInlineButton(S.btnBack, "vocab_list:$lessonId")))
         }
 
         context.sendHtml(
             query.from,
-            vocabText,
+            text,
+            replyMarkup = InlineKeyboardMarkup(buttons)
+        )
+    }
+
+    private suspend fun handleVocabularyAddAll(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        lessonId: Int?
+    ) {
+        if (lessonId == null) {
+            return
+        }
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val vocabIds = lessonService.getVocabulary(lessonId).map { it.id }
+        val added = dictionaryService.addAllFavorites(user.id, vocabIds)
+        context.sendHtml(query.from, S.dictionaryAddedAll(added))
+        handleVocabularyList(context, query, lessonId)
+    }
+
+    private suspend fun handleVocabularyAdd(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        lessonId: Int?,
+        vocabId: Int?
+    ) {
+        if (lessonId == null || vocabId == null) {
+            return
+        }
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        dictionaryService.addFavorite(user.id, vocabId)
+        handleVocabularyWord(context, query, lessonId, vocabId)
+    }
+
+    private suspend fun handleVocabularyRemove(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        lessonId: Int?,
+        vocabId: Int?
+    ) {
+        if (lessonId == null || vocabId == null) {
+            return
+        }
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        dictionaryService.removeFavorite(user.id, vocabId)
+        handleVocabularyWord(context, query, lessonId, vocabId)
+    }
+
+    private suspend fun handlePracticeStart(context: BehaviourContext, query: DataCallbackQuery) {
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        handleLessonPractice(context, query, user.currentLessonId)
+    }
+
+    private suspend fun handleLessonPractice(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        lessonId: Int?
+    ) {
+        if (lessonId == null) {
+            return
+        }
+        val lesson = lessonService.getLessonById(lessonId) ?: run {
+            context.sendHtml(query.from, S.lessonNotFound)
+            return
+        }
+        val exercises = exerciseService.buildLessonExercises(lesson.id)
+        if (exercises.isEmpty()) {
+            context.sendHtml(query.from, S.exerciseNotReady)
+            return
+        }
+
+        val payload = ExerciseFlowPayload(
+            lessonId = lesson.id,
+            exerciseIndex = 0,
+            vocabularyIds = exercises.map { it.vocabularyId },
+            optionsByVocabId = exercises.associate { it.vocabularyId to it.options },
+            correctByVocabId = exercises.associate { it.vocabularyId to it.correctOption },
+            explanationsByVocabId = exercises.associate { it.vocabularyId to it.explanation }
+        )
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        userStateService.set(user.id, UserFlowState.EXERCISE.name, json.encodeToString(payload))
+        sendExercise(context, query, payload)
+    }
+
+    private suspend fun handleExerciseAnswer(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        parts: List<String>
+    ) {
+        if (parts.size < 4) {
+            return
+        }
+        val vocabId = parts[2].toIntOrNull() ?: return
+        val selectedIndex = parts[3].toIntOrNull() ?: return
+
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val state = userStateService.get(user.id) ?: return
+        if (state.state != UserFlowState.EXERCISE.name) {
+            return
+        }
+
+        val payload = json.decodeFromString<ExerciseFlowPayload>(state.payload)
+        val options = payload.optionsByVocabId[vocabId] ?: return
+        val selected = options.getOrNull(selectedIndex) ?: return
+        val correct = payload.correctByVocabId[vocabId] ?: return
+        val isCorrect = selected == correct
+
+        val verdict = if (isCorrect) S.exerciseCorrect else S.exerciseIncorrect
+
+        analyticsService.log(
+            "exercise_answered",
+            user.id,
+            props = mapOf("isCorrect" to isCorrect.toString())
+        )
+
+        val explanation = payload.explanationsByVocabId[vocabId] ?: ""
+        val buttons = if (isCorrect) {
+            listOf(listOf(dataInlineButton(S.btnNext, "exercise_next")))
+        } else {
+            listOf(
+                listOf(dataInlineButton(S.btnAddToDictionary, "exercise_add_dict:$vocabId")),
+                listOf(dataInlineButton(S.btnNext, "exercise_next"))
+            )
+        }
+
+        context.sendHtml(
+            query.from,
+            buildString {
+                appendLine(verdict)
+                if (explanation.isNotBlank()) {
+                    appendLine(explanation)
+                }
+            },
+            replyMarkup = InlineKeyboardMarkup(buttons)
+        )
+    }
+
+    private suspend fun handleExerciseAddDictionary(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        vocabId: Int?
+    ) {
+        if (vocabId == null) {
+            return
+        }
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        dictionaryService.addFavorite(user.id, vocabId)
+        handleExerciseNext(context, query)
+    }
+
+    private suspend fun handleExerciseNext(context: BehaviourContext, query: DataCallbackQuery) {
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val state = userStateService.get(user.id) ?: return
+        if (state.state != UserFlowState.EXERCISE.name) {
+            return
+        }
+        val payload = json.decodeFromString<ExerciseFlowPayload>(state.payload)
+        val nextIndex = payload.exerciseIndex + 1
+        if (nextIndex >= payload.vocabularyIds.size) {
+            userStateService.clear(user.id)
+            progressService.recordPractice(user.id)
+            context.sendHtml(
+                query.from,
+                S.exerciseComplete,
+                replyMarkup = InlineKeyboardMarkup(
+                    listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
+                )
+            )
+            return
+        }
+
+        val nextPayload = payload.copy(exerciseIndex = nextIndex)
+        userStateService.set(user.id, UserFlowState.EXERCISE.name, json.encodeToString(nextPayload))
+        sendExercise(context, query, nextPayload)
+    }
+
+    private suspend fun sendExercise(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        payload: ExerciseFlowPayload
+    ) {
+        val vocabId = payload.vocabularyIds.getOrNull(payload.exerciseIndex) ?: return
+        val vocab = lessonService.findVocabularyById(vocabId) ?: return
+        val options = payload.optionsByVocabId[vocabId] ?: return
+
+        val buttons = options.mapIndexed { index, option ->
+            listOf(dataInlineButton(option, "exercise_answer:${payload.lessonId}:$vocabId:$index"))
+        }
+
+        analyticsService.log(
+            "exercise_started",
+            userService.findByTelegramId(query.from.id.chatId.long)?.id ?: return,
+            props = mapOf("type" to "vocab_mcq")
+        )
+
+        context.sendHtml(
+            query.from,
+            S.exercisePrompt(vocab.word),
+            replyMarkup = InlineKeyboardMarkup(buttons)
+        )
+    }
+
+    private suspend fun handleDictionaryPrompt(context: BehaviourContext, query: DataCallbackQuery) {
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        handleDictionaryList(context, query, 0)
+    }
+
+    private suspend fun handleDictionaryList(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        page: Int
+    ) {
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val entries = dictionaryService.listUserDictionary(user.id)
+        val perPage = 15
+        val totalPages = (entries.size + perPage - 1) / perPage
+        val safePage = page.coerceIn(0, maxOf(totalPages - 1, 0))
+        val pageEntries = entries.drop(safePage * perPage).take(perPage)
+
+        if (pageEntries.isEmpty()) {
+            context.sendHtml(
+                query.from,
+                S.dictionaryEmpty,
+                replyMarkup = InlineKeyboardMarkup(
+                    listOf(
+                        listOf(dataInlineButton(S.btnAddCustomWord, "dict_add_custom")),
+                        listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
+                    )
+                )
+            )
+            return
+        }
+
+        val text = buildString {
+            appendLine(S.vocabularyTitle)
+            appendLine()
+            pageEntries.forEach { entry ->
+                appendLine(S.vocabularyItem(entry.word, entry.translation))
+                entry.pronunciation?.let { appendLine(S.vocabularyPronunciation(it)) }
+                entry.example?.let { appendLine(S.vocabularyExample(it)) }
+                appendLine()
+            }
+            if (totalPages > 1) {
+                appendLine("Страница ${safePage + 1}/$totalPages")
+            }
+        }
+
+        val buttons = buildList {
+            if (totalPages > 1) {
+                val nav = buildList {
+                    if (safePage > 0) add(dataInlineButton("◀️", "dict_list:${safePage - 1}"))
+                    if (safePage < totalPages - 1) add(dataInlineButton("▶️", "dict_list:${safePage + 1}"))
+                }
+                if (nav.isNotEmpty()) {
+                    add(nav)
+                }
+            }
+            add(listOf(dataInlineButton(S.btnAddCustomWord, "dict_add_custom")))
+            add(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
+        }
+
+        context.sendHtml(
+            query.from,
+            text,
+            replyMarkup = InlineKeyboardMarkup(buttons)
+        )
+    }
+
+    private suspend fun handleDictionaryAddCustom(context: BehaviourContext, query: DataCallbackQuery) {
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        userStateService.set(user.id, UserFlowState.DICT_ADD_CUSTOM.name, "{}")
+        context.sendHtml(query.from, S.dictionaryAddPrompt)
+    }
+
+    private suspend fun handleDictionaryFavorite(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        vocabId: Int?
+    ) {
+        if (vocabId == null) {
+            return
+        }
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val entry = dictionaryService.toggleFavorite(user.id, vocabId)
+        val status = if (entry.isFavorite) S.dictionaryFavorited else S.dictionaryUnfavorited
+        analyticsService.log("word_favorited", user.id, props = mapOf("itemId" to vocabId.toString()))
+        context.sendHtml(query.from, status)
+    }
+
+    private suspend fun handleDictionaryTags(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        vocabId: Int?
+    ) {
+        if (vocabId == null) {
+            return
+        }
+        val tags = listOf("фразы", "глаголы", "существительные", "часто")
+        val buttons = tags.map { tag ->
+            listOf(dataInlineButton(tag, "dict_tag:$vocabId:$tag"))
+        }
+        context.sendHtml(
+            query.from,
+            S.dictionaryTagPrompt,
+            replyMarkup = InlineKeyboardMarkup(buttons + listOf(listOf(dataInlineButton(S.btnBack, "dictionary_prompt"))))
+        )
+    }
+
+    private suspend fun handleDictionaryTagToggle(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        parts: List<String>
+    ) {
+        if (parts.size < 3) {
+            return
+        }
+        val vocabId = parts[1].toIntOrNull() ?: return
+        val tag = parts[2]
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val entry = dictionaryService.getEntry(user.id, vocabId)
+        val tags = entry?.tags?.let { json.decodeFromString<List<String>>(it) } ?: emptyList()
+        val nextTags = if (tags.contains(tag)) tags - tag else tags + tag
+        dictionaryService.setTags(user.id, vocabId, nextTags)
+        context.sendHtml(query.from, S.dictionaryTagsUpdated(nextTags.joinToString(", ")))
+    }
+
+    private suspend fun handleReviewStart(context: BehaviourContext, query: DataCallbackQuery) {
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val queue = reviewService.buildQueue(user.id, limit = 12, currentLessonId = user.currentLessonId)
+        if (queue.isEmpty()) {
+            context.sendHtml(query.from, S.reviewEmpty)
+            return
+        }
+
+        val payload = ReviewFlowPayload(
+            vocabularyIds = queue.map { it.id },
+            index = 0
+        )
+        userStateService.set(user.id, UserFlowState.REVIEW.name, json.encodeToString(payload))
+        analyticsService.log("review_started", user.id)
+        sendReviewCard(context, query, payload)
+    }
+
+    private suspend fun handleReviewAnswer(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        parts: List<String>
+    ) {
+        if (parts.size < 3) {
+            return
+        }
+        val vocabId = parts[1].toIntOrNull() ?: return
+        val isCorrect = parts[2] == "1"
+
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        reviewService.updateCard(user.id, vocabId, isCorrect)
+        progressService.recordReview(user.id)
+        analyticsService.log("review_completed", user.id, props = mapOf("isCorrect" to isCorrect.toString()))
+
+        val state = userStateService.get(user.id) ?: return
+        if (state.state != UserFlowState.REVIEW.name) {
+            return
+        }
+        val payload = json.decodeFromString<ReviewFlowPayload>(state.payload)
+        val nextIndex = payload.index + 1
+        if (nextIndex >= payload.vocabularyIds.size) {
+            userStateService.clear(user.id)
+            context.sendHtml(query.from, S.reviewDone)
+            return
+        }
+        val nextPayload = payload.copy(index = nextIndex)
+        userStateService.set(user.id, UserFlowState.REVIEW.name, json.encodeToString(nextPayload))
+        sendReviewCard(context, query, nextPayload)
+    }
+
+    private suspend fun sendReviewCard(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        payload: ReviewFlowPayload
+    ) {
+        val vocabId = payload.vocabularyIds.getOrNull(payload.index) ?: return
+        val item = lessonService.findVocabularyById(vocabId) ?: return
+        val card = buildString {
+            appendLine(S.reviewCardTitle(item.word))
+            appendLine(S.reviewCardTranslation(item.translation))
+            item.example?.let { appendLine(S.dictionaryExample(it)) }
+        }
+
+        context.sendHtml(
+            query.from,
+            card,
             replyMarkup = InlineKeyboardMarkup(
-                listOf(listOf(dataInlineButton(S.btnGoToHomework, "homework:$lessonId")))
+                listOf(
+                    listOf(
+                        dataInlineButton(S.btnRemember, "review_answer:$vocabId:1"),
+                        dataInlineButton(S.btnAgain, "review_answer:$vocabId:0")
+                    )
+                )
             )
         )
+    }
+
+    private suspend fun handleReminders(context: BehaviourContext, query: DataCallbackQuery) {
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val pref = reminderPreferenceService.getOrDefault(user.id)
+        val status = if (pref.isEnabled) S.reminderStatusOn(pref.daysOfWeek, pref.timeLocal)
+        else S.reminderStatusOff
+
+        context.sendHtml(
+            query.from,
+            status,
+            replyMarkup = InlineKeyboardMarkup(
+                listOf(
+                    listOf(dataInlineButton(S.btnEnableWeekdays, "reminder_enable_weekdays")),
+                    listOf(dataInlineButton(S.btnDisableReminders, "reminder_disable")),
+                    listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
+                )
+            )
+        )
+    }
+
+    private suspend fun handleReminderEnableWeekdays(context: BehaviourContext, query: DataCallbackQuery) {
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val pref = reminderPreferenceService.setSchedule(user.id, "MON,TUE,WED,THU,FRI", "19:00")
+        analyticsService.log("reminder_set", user.id, props = mapOf("schedule" to "${pref.daysOfWeek} ${pref.timeLocal}"))
+        context.sendHtml(query.from, S.reminderEnabled(pref.daysOfWeek, pref.timeLocal))
+    }
+
+    private suspend fun handleReminderDisable(context: BehaviourContext, query: DataCallbackQuery) {
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        reminderPreferenceService.setEnabled(user.id, false)
+        context.sendHtml(query.from, S.reminderDisabled)
+    }
+
+    private suspend fun handleHelp(context: BehaviourContext, query: DataCallbackQuery) {
+        context.sendHtml(query.from, S.help)
+    }
+
+    private suspend fun handleContinue(context: BehaviourContext, query: DataCallbackQuery) {
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val state = userStateService.get(user.id)
+        if (state == null) {
+            context.sendHtml(query.from, S.continueNothing)
+            return
+        }
+
+        when (state.state) {
+            UserFlowState.EXERCISE.name -> {
+                val payload = json.decodeFromString<ExerciseFlowPayload>(state.payload)
+                sendExercise(context, query, payload)
+            }
+            UserFlowState.REVIEW.name -> {
+                val payload = json.decodeFromString<ReviewFlowPayload>(state.payload)
+                sendReviewCard(context, query, payload)
+            }
+            UserFlowState.DICT_SEARCH.name -> {
+                context.sendHtml(query.from, S.dictionaryPrompt)
+            }
+            UserFlowState.HOMEWORK_TEXT.name -> {
+                context.sendHtml(query.from, S.homeworkContinue)
+            }
+        }
     }
 
     private suspend fun handleHomeworkCallback(
@@ -157,6 +795,10 @@ class CallbackHandler(
                 listOf(listOf(dataInlineButton(S.btnStartHomework, "start_homework:$lessonId")))
             )
         )
+        val user = userService.findByTelegramId(query.from.id.chatId.long)
+        if (user != null) {
+            analyticsService.log("hw_opened", user.id, props = mapOf("lessonId" to lessonId.toString()))
+        }
     }
 
     private suspend fun handleStartHomework(
@@ -180,13 +822,14 @@ class CallbackHandler(
                 query.from,
                 S.homeworkAlreadyCompleted,
                 replyMarkup = InlineKeyboardMarkup(
-                    listOf(listOf(dataInlineButton(S.btnNextLesson, "next_lesson")))
+                    listOf(listOf(dataInlineButton(S.btnContinue, "lesson_start:${user.currentLessonId}")))
                 )
             )
             return
         }
 
         sendQuestion(context, query, homework.questions.first(), 0, homework.id)
+        analyticsService.log("hw_opened", user.id, props = mapOf("lessonId" to lessonId.toString()))
     }
 
     private suspend fun sendQuestion(
@@ -212,6 +855,10 @@ class CallbackHandler(
             QuestionType.TEXT_INPUT, QuestionType.TRANSLATION -> {
                 context.sendHtml(query.from, "$questionText\n\n${S.writeYourAnswer}")
                 HomeworkStateManager.setCurrentQuestion(query.from.id.chatId.long, homeworkId, question.id)
+                val user = userService.findByTelegramId(query.from.id.chatId.long)
+                if (user != null) {
+                    userStateService.set(user.id, UserFlowState.HOMEWORK_TEXT.name, "{}")
+                }
             }
         }
     }
@@ -235,31 +882,125 @@ class CallbackHandler(
         HomeworkStateManager.setAnswers(user.telegramId, currentAnswers)
 
         val homework = homeworkService.getHomeworkForLesson(user.currentLessonId) ?: return
+        val question = homework.questions.firstOrNull { it.id == questionId } ?: return
         val currentIndex = homework.questions.indexOfFirst { it.id == questionId }
+
+        val isCorrect = homeworkService.isAnswerCorrect(question, answer)
+
+        if (!isCorrect) {
+            val buttons = buildHomeworkWrongButtons(homeworkId, questionId, homework.lessonId, question)
+            val text = buildString {
+                appendLine(S.exerciseIncorrect)
+                appendLine(S.homeworkCorrectAnswer(question.correctAnswer))
+            }
+            context.sendHtml(
+                query.from,
+                text,
+                replyMarkup = InlineKeyboardMarkup(buttons)
+            )
+            return
+        }
 
         if (currentIndex < homework.questions.size - 1) {
             sendQuestion(context, query, homework.questions[currentIndex + 1], currentIndex + 1, homeworkId)
         } else {
-            val submission = homeworkService.submitHomework(user.id, homeworkId, currentAnswers)
-            HomeworkStateManager.clearState(user.telegramId)
-
-            val resultText = if (submission.score == submission.maxScore) {
-                S.homeworkComplete(submission.score, submission.maxScore)
-            } else {
-                S.homeworkResult(submission.score, submission.maxScore)
-            }
-
-            val keyboard = if (submission.score == submission.maxScore) {
-                InlineKeyboardMarkup(listOf(listOf(dataInlineButton(S.btnNextLesson, "next_lesson"))))
-            } else {
-                InlineKeyboardMarkup(
-                    listOf(listOf(dataInlineButton(S.btnTryAgain, "start_homework:${user.currentLessonId}")))
-                )
-            }
-
-            context.sendHtml(query.from, resultText, replyMarkup = keyboard)
+            submitHomeworkResult(context, query, user, homework, currentAnswers)
         }
     }
+
+    private suspend fun handleHomeworkNext(context: BehaviourContext, query: DataCallbackQuery, parts: List<String>) {
+        if (parts.size < 3) return
+        val homeworkId = parts[1].toIntOrNull() ?: return
+        val questionId = parts[2].toIntOrNull() ?: return
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val homework = homeworkService.getHomeworkForLesson(user.currentLessonId) ?: return
+        val currentIndex = homework.questions.indexOfFirst { it.id == questionId }
+        if (currentIndex < homework.questions.size - 1) {
+            sendQuestion(context, query, homework.questions[currentIndex + 1], currentIndex + 1, homeworkId)
+        } else {
+            val answers = HomeworkStateManager.getAnswers(user.telegramId)
+            submitHomeworkResult(context, query, user, homework, answers)
+        }
+    }
+
+    private suspend fun handleHomeworkAddDictionary(context: BehaviourContext, query: DataCallbackQuery, parts: List<String>) {
+        if (parts.size < 3) return
+        val homeworkId = parts[1].toIntOrNull() ?: return
+        val questionId = parts[2].toIntOrNull() ?: return
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val homework = homeworkService.getHomeworkForLesson(user.currentLessonId) ?: return
+        val question = homework.questions.firstOrNull { it.id == questionId } ?: return
+        val vocabId = resolveHomeworkVocabularyId(homework.lessonId, question)
+        if (vocabId != null) {
+            dictionaryService.addFavorite(user.id, vocabId)
+        }
+        handleHomeworkNext(context, query, listOf("hw_next", homeworkId.toString(), questionId.toString()))
+    }
+
+    private suspend fun submitHomeworkResult(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        user: com.turki.core.domain.User,
+        homework: com.turki.core.domain.Homework,
+        answers: Map<Int, String>
+    ) {
+        val submission = homeworkService.submitHomework(user.id, homework.id, answers)
+        HomeworkStateManager.clearState(user.telegramId)
+        userStateService.clear(user.id)
+        progressService.recordHomework(user.id)
+        if (submission.score == submission.maxScore) {
+            progressService.markLessonCompleted(user.id, homework.lessonId)
+        }
+        analyticsService.log("hw_submitted", user.id, props = mapOf("score" to submission.score.toString()))
+
+        val resultText = if (submission.score == submission.maxScore) {
+            S.homeworkComplete(submission.score, submission.maxScore)
+        } else {
+            S.homeworkResult(submission.score, submission.maxScore)
+        }
+
+        val feedback = buildHomeworkFeedback(homework, answers, submission.score, submission.maxScore)
+        val keyboard = InlineKeyboardMarkup(
+            listOf(
+                listOf(dataInlineButton(S.btnRepeatTopic, "lesson_start:${homework.lessonId}")),
+                listOf(dataInlineButton(S.btnNextHomework, "next_homework:${homework.lessonId}"))
+            )
+        )
+
+        context.sendHtml(query.from, "$resultText\n\n$feedback", replyMarkup = keyboard)
+    }
+
+    private suspend fun buildHomeworkWrongButtons(
+        homeworkId: Int,
+        questionId: Int,
+        lessonId: Int,
+        question: com.turki.core.domain.HomeworkQuestion
+    ) = buildList {
+        val vocabId = resolveHomeworkVocabularyId(lessonId, question)
+        if (vocabId != null) {
+            add(listOf(dataInlineButton(S.btnAddToDictionary, "hw_add_dict:$homeworkId:$questionId")))
+        } else {
+            add(listOf(dataInlineButton(S.btnAddCustomWord, "dict_add_custom")))
+        }
+        add(listOf(dataInlineButton(S.btnNext, "hw_next:$homeworkId:$questionId")))
+    }
+
+    private suspend fun resolveHomeworkVocabularyId(
+        lessonId: Int,
+        question: com.turki.core.domain.HomeworkQuestion
+    ): Int? {
+        val vocabulary = lessonService.getVocabulary(lessonId)
+        val answer = normalizeText(question.correctAnswer)
+        val questionText = normalizeText(question.questionText)
+        return vocabulary.firstOrNull { item ->
+            val word = normalizeText(item.word)
+            val translation = normalizeText(item.translation)
+            word == answer || translation == answer || questionText.contains(word) || questionText.contains(translation)
+        }?.id
+    }
+
+    private fun normalizeText(text: String): String =
+        text.lowercase().replace(Regex("[^\\p{L}\\p{Nd}]"), "")
 
     private suspend fun handleProgressCallback(context: BehaviourContext, query: DataCallbackQuery) {
         val user = userService.findByTelegramId(query.from.id.chatId.long) ?: run {
@@ -267,23 +1008,25 @@ class CallbackHandler(
             return
         }
 
-        val totalLessons = lessonService.getLessonsByLanguage(Language.TURKISH).size
-        val completedLessons = user.currentLessonId - 1
+        val summary = progressService.getProgressSummary(user.id)
 
         val progressText = S.progress(
             firstName = user.firstName,
-            completedLessons = completedLessons,
-            totalLessons = totalLessons,
-            subscriptionActive = user.subscriptionActive
+            completedLessons = summary.completedLessons,
+            totalLessons = summary.totalLessons,
+            subscriptionActive = user.subscriptionActive,
+            currentLevel = summary.currentLevel,
+            streakDays = summary.currentStreak
         )
 
         context.sendHtml(query.from, progressText)
+        analyticsService.log("progress_opened", user.id)
     }
 
     private suspend fun handleNextLessonCallback(context: BehaviourContext, query: DataCallbackQuery) {
         val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
 
-        val nextLesson = lessonService.getNextLesson(user.currentLessonId, Language.TURKISH)
+        val nextLesson = lessonService.getLessonById(user.currentLessonId)
 
         if (nextLesson == null) {
             context.sendHtml(query.from, S.allLessonsCompleted)
@@ -347,14 +1090,27 @@ class CallbackHandler(
     private suspend fun handleConfirmReset(context: BehaviourContext, query: DataCallbackQuery) {
         val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
         userService.resetProgress(user.id)
+        userStateService.clear(user.id)
+        progressService.resetProgress(user.id)
+        dictionaryService.clearUser(user.id)
+        reviewService.clearUser(user.id)
 
         context.sendHtml(
             query.from,
             S.progressResetSuccess,
             replyMarkup = InlineKeyboardMarkup(
-                listOf(listOf(dataInlineButton("${S.btnStartLesson} 1", "lesson:1")))
+                listOf(listOf(dataInlineButton("${S.btnStartLesson} 1", "lesson_start:1")))
             )
         )
+    }
+
+    private suspend fun handleConfirmDelete(context: BehaviourContext, query: DataCallbackQuery) {
+        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: run {
+            context.sendHtml(query.from, S.notRegistered)
+            return
+        }
+        userDataService.deleteUserData(user.id)
+        context.sendHtml(query.from, S.deleteDataSuccess)
     }
 
     private suspend fun handleSelectLevel(context: BehaviourContext, query: DataCallbackQuery) {
@@ -406,25 +1162,69 @@ class CallbackHandler(
         )
     }
 
+    private suspend fun handleNextHomework(context: BehaviourContext, query: DataCallbackQuery, lessonId: Int?) {
+        if (lessonId == null) {
+            return
+        }
+        val nextLesson = lessonService.getNextLesson(lessonId, Language.TURKISH)
+        if (nextLesson == null) {
+            context.sendHtml(query.from, S.homeworkNoNext)
+            return
+        }
+        handleHomeworkCallback(context, query, nextLesson.id)
+    }
+
     private suspend fun handleBackToMenu(context: BehaviourContext, query: DataCallbackQuery) {
         val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val hasState = userStateService.get(user.id) != null
+        val buttons = buildList {
+            if (hasState) {
+                add(listOf(dataInlineButton(S.btnContinue, "continue")))
+            }
+            addAll(
+                listOf(
+                    listOf(dataInlineButton(S.btnLessons, "lessons_list")),
+                    listOf(dataInlineButton(S.btnPractice, "practice_start")),
+                    listOf(dataInlineButton(S.btnDictionary, "dictionary_prompt")),
+                    listOf(dataInlineButton(S.btnReview, "review_start")),
+                    listOf(dataInlineButton(S.btnHomework, "homework:${user.currentLessonId}")),
+                    listOf(dataInlineButton(S.btnProgress, "progress")),
+                    listOf(dataInlineButton(S.btnReminders, "reminders")),
+                    listOf(dataInlineButton(S.btnResetProgress, "reset_progress")),
+                    listOf(dataInlineButton(S.btnHelp, "help"))
+                )
+            )
+        }
 
         context.sendHtml(
             query.from,
-            S.mainMenuTitle,
-            replyMarkup = InlineKeyboardMarkup(
-                listOf(
-                    listOf(dataInlineButton(S.btnContinueLesson, "lesson:${user.currentLessonId}")),
-                    listOf(dataInlineButton(S.btnHomework, "homework:${user.currentLessonId}")),
-                    listOf(dataInlineButton(S.btnProgress, "progress")),
-                    listOf(
-                        dataInlineButton(S.btnSelectLevel, "select_level"),
-                        dataInlineButton(S.btnKnowledgeTest, "knowledge_test")
-                    ),
-                    listOf(dataInlineButton(S.btnSettings, "settings"))
-                )
-            )
+            S.menuTitle,
+            replyMarkup = InlineKeyboardMarkup(buttons)
         )
+    }
+
+    private fun buildHomeworkFeedback(
+        homework: com.turki.core.domain.Homework,
+        answers: Map<Int, String>,
+        score: Int,
+        maxScore: Int
+    ): String {
+        val wrong = homework.questions.filter { question ->
+            !homeworkService.isAnswerCorrect(question, answers[question.id])
+        }
+
+        if (wrong.isEmpty()) {
+            if (score < maxScore) {
+                return "Есть ошибки — попробуйте ещё раз."
+            }
+            return S.homeworkFeedbackPerfect
+        }
+
+        val lines = wrong.take(3).joinToString("\n") { question ->
+            "• ${question.questionText}\n  ${S.homeworkCorrectAnswer(question.correctAnswer)}"
+        }
+
+        return S.homeworkFeedbackSummary(lines, wrong.size)
     }
 }
 
@@ -448,5 +1248,9 @@ object HomeworkStateManager {
     fun clearState(telegramId: Long) {
         currentQuestions.remove(telegramId)
         userAnswers.remove(telegramId)
+    }
+
+    fun clearCurrentQuestion(telegramId: Long) {
+        currentQuestions.remove(telegramId)
     }
 }

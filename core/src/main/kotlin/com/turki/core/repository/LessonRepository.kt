@@ -28,7 +28,7 @@ interface LessonRepository {
      * @param language The target language to filter lessons
      * @return List of [Lesson] objects sorted by orderIndex
      */
-    suspend fun findByLanguage(language: Language): List<Lesson>
+    suspend fun findByLanguage(language: Language, level: String? = null): List<Lesson>
 
     /**
      * Retrieves all lessons in the system, ordered by index.
@@ -44,7 +44,7 @@ interface LessonRepository {
      * @param language The target language
      * @return The next [Lesson] if available, null if no more lessons
      */
-    suspend fun findNextLesson(currentLessonId: Int, language: Language): Lesson?
+    suspend fun findNextLesson(currentLessonId: Int, language: Language, level: String? = null): Lesson?
 
     /**
      * Retrieves all vocabulary items for a specific lesson.
@@ -53,6 +53,20 @@ interface LessonRepository {
      * @return List of [VocabularyItem] objects for the lesson
      */
     suspend fun getVocabularyItems(lessonId: Int): List<VocabularyItem>
+
+    /**
+     * Searches vocabulary items by word or translation.
+     *
+     * @param query The search query
+     * @param limit Max number of results
+     * @return List of matching [VocabularyItem]
+     */
+    suspend fun searchVocabulary(query: String, limit: Int = 5): List<VocabularyItem>
+
+    /**
+     * Retrieves a vocabulary item by its database ID.
+     */
+    suspend fun findVocabularyById(id: Int): VocabularyItem?
 
     /**
      * Creates a new lesson in the database.

@@ -5,6 +5,9 @@ on:
     - cron: '0 2 * * *'
   workflow_dispatch:
 
+env:
+  PACKAGE_NAME: turki
+
 jobs:
   cleanup:
     runs-on: ubuntu-latest
@@ -16,27 +19,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Delete old non-main images
-        uses: actions/delete-package-versions@v4
+      - name: Delete old non-main bot images
+        uses: actions/delete-package-versions@v5
         with:
-          package-name: ${{ github.repository }}
+          package-name: ${{ env.PACKAGE_NAME }}
           package-type: 'container'
           min-versions-to-keep: 10
           delete-only-untagged-versions: false
-          older-than-days: 1
-          ignore-versions: |
-            .*-main-.*
-            latest
+          ignore-versions: '^(latest|main-.*)$'
 
       - name: Delete old non-main admin images
         continue-on-error: true
-        uses: actions/delete-package-versions@v4
+        uses: actions/delete-package-versions@v5
         with:
-          package-name: ${{ github.repository }}-admin
+          package-name: ${{ env.PACKAGE_NAME }}-admin
           package-type: 'container'
           min-versions-to-keep: 10
           delete-only-untagged-versions: false
-          older-than-days: 1
-          ignore-versions: |
-            .*-main-.*
-            latest
+          ignore-versions: '^(latest|main-.*)$'

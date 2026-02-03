@@ -135,4 +135,11 @@ class UserService(private val userRepository: UserRepository) {
      * @param userId The user's database ID
      */
     suspend fun resetProgress(userId: Long) = userRepository.resetProgress(userId)
+
+    /**
+     * Deletes a user account and basic profile data.
+     *
+     * @param userId The user's database ID
+     */
+    suspend fun deleteUser(userId: Long) = userRepository.delete(userId)
 }

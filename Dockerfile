@@ -29,7 +29,9 @@ COPY --from=build /app/bot/build/libs/*.jar /app/bot.jar
 EXPOSE 8080
 
 ENV BOT_TOKEN=""
-ENV DB_PATH="/app/data/turki.db"
+ENV DB_URL="jdbc:postgresql://postgres:5432/turki"
+ENV DB_USER="turki"
+ENV DB_PASSWORD="turki"
 ENV PORT="8080"
 
 ENTRYPOINT ["java", "-jar", "/app/bot.jar"]

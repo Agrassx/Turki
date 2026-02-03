@@ -6,6 +6,7 @@ serialization = "1.8.0"
 exposed = "0.57.0"
 h2 = "2.3.232"
 sqlite = "3.48.0.0"
+postgres = "42.7.3"
 telegramBot = "22.0.0"
 compose = "1.7.3"
 koin = "4.0.2"
@@ -42,6 +43,7 @@ exposed-jdbc = { module = "org.jetbrains.exposed:exposed-jdbc", version.ref = "e
 exposed-datetime = { module = "org.jetbrains.exposed:exposed-kotlin-datetime", version.ref = "exposed" }
 h2-database = { module = "com.h2database:h2", version.ref = "h2" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite" }
+postgresql-jdbc = { module = "org.postgresql:postgresql", version.ref = "postgres" }
 
 # Telegram Bot
 telegram-bot = { module = "dev.inmo:tgbotapi", version.ref = "telegramBot" }

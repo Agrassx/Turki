@@ -27,8 +27,8 @@ class LessonService(private val lessonRepository: LessonRepository) {
      * @param language The target language to filter lessons
      * @return List of [Lesson] objects sorted by orderIndex
      */
-    suspend fun getLessonsByLanguage(language: Language): List<Lesson> =
-        lessonRepository.findByLanguage(language)
+    suspend fun getLessonsByLanguage(language: Language, level: String? = "A1"): List<Lesson> =
+        lessonRepository.findByLanguage(language, level)
 
     /**
      * Finds the next lesson after the current one for a given language.
@@ -37,8 +37,8 @@ class LessonService(private val lessonRepository: LessonRepository) {
      * @param language The target language
      * @return The next [Lesson] if available, null if no more lessons
      */
-    suspend fun getNextLesson(currentLessonId: Int, language: Language): Lesson? =
-        lessonRepository.findNextLesson(currentLessonId, language)
+    suspend fun getNextLesson(currentLessonId: Int, language: Language, level: String? = "A1"): Lesson? =
+        lessonRepository.findNextLesson(currentLessonId, language, level)
 
     /**
      * Retrieves all vocabulary items for a specific lesson.
@@ -48,6 +48,18 @@ class LessonService(private val lessonRepository: LessonRepository) {
      */
     suspend fun getVocabulary(lessonId: Int): List<VocabularyItem> =
         lessonRepository.getVocabularyItems(lessonId)
+
+    /**
+     * Searches vocabulary by word or translation.
+     */
+    suspend fun searchVocabulary(query: String, limit: Int = 5): List<VocabularyItem> =
+        lessonRepository.searchVocabulary(query, limit)
+
+    /**
+     * Retrieves a vocabulary item by ID.
+     */
+    suspend fun findVocabularyById(id: Int): VocabularyItem? =
+        lessonRepository.findVocabularyById(id)
 
     /**
      * Retrieves all lessons in the system, ordered by index.

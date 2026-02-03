@@ -26,7 +26,9 @@ import org.koin.core.context.startKoin
  *
  * **Environment Variables:**
  * - `BOT_TOKEN` - Telegram bot token (required for bot mode)
- * - `DB_PATH` - Database file path (optional, default: "data/turki.db")
+ * - `DB_URL` - Postgres JDBC URL (optional, default: "jdbc:postgresql://localhost:5432/turki")
+ * - `DB_USER` - Postgres user (optional, default: "turki")
+ * - `DB_PASSWORD` - Postgres password (optional, default: "turki")
  * - `PORT` - HTTP server port (optional, default: 8080)
  *
  * @param args Command line arguments:
@@ -37,10 +39,12 @@ import org.koin.core.context.startKoin
 fun main(args: Array<String>) {
     EnvLoader.load()
 
-    val dbPath = EnvLoader.get("DB_PATH", "data/turki.db")!!
+    val dbUrl = EnvLoader.get("DB_URL", "jdbc:postgresql://localhost:5432/turki")
+    val dbUser = EnvLoader.get("DB_USER", "turki")
+    val dbPassword = EnvLoader.get("DB_PASSWORD", "turki")
 
     if (args.isNotEmpty() && args[0] == "import") {
-        DatabaseFactory.init(dbPath)
+        DatabaseFactory.init(dbUrl, dbUser, dbPassword)
         val dataDir = args.getOrNull(1) ?: "data"
         ImportData.importAll(dataDir)
         return
@@ -63,7 +67,7 @@ fun main(args: Array<String>) {
         return
     }
 
-    DatabaseFactory.init(dbPath)
+    DatabaseFactory.init(dbUrl, dbUser, dbPassword)
 
     startKoin {
         modules(coreModule, botModule)

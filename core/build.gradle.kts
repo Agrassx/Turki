@@ -7,6 +7,6 @@ plugins {
 dependencies {
     api(libs.bundles.kotlin.common)
     api(libs.bundles.exposed)
-    api(libs.sqlite.jdbc)
+    api(libs.postgresql.jdbc)
     implementation(libs.koin.core)
 }

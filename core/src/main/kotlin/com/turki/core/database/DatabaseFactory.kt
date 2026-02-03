@@ -5,7 +5,6 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.io.File
 
 /**
  * Factory object for database initialization and connection management.
@@ -26,8 +25,6 @@ import java.io.File
  * - RemindersTable - Scheduled reminders for users
  */
 object DatabaseFactory {
-
-    private var dbPath: String? = null
 
     /**
      * Initializes the database connection and creates all required tables.
@@ -52,21 +49,26 @@ object DatabaseFactory {
      * DatabaseFactory.init("data/custom.db")
      * ```
      */
-    fun init(dbPath: String? = null) {
-        val path = dbPath ?: System.getenv("DATABASE_PATH") ?: findProjectRoot() + "/data/turki.db"
-        this.dbPath = path
-        
-        val dbFile = File(path)
-        dbFile.parentFile?.mkdirs()
+    fun init(dbUrl: String? = null, dbUser: String? = null, dbPassword: String? = null) {
+        val url = dbUrl ?: System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5432/turki"
+        val user = dbUser ?: System.getenv("DB_USER") ?: "turki"
+        val password = dbPassword ?: System.getenv("DB_PASSWORD") ?: "turki"
 
-        println("📦 База данных: $path")
+        println("📦 База данных: $url")
 
-        val driverClassName = "org.sqlite.JDBC"
-        val jdbcUrl = "jdbc:sqlite:$path"
-
-        Database.connect(jdbcUrl, driverClassName)
+        Database.connect(
+            url = url,
+            driver = "org.postgresql.Driver",
+            user = user,
+            password = password
+        )
 
         transaction {
+            exec("CREATE SCHEMA IF NOT EXISTS content")
+            exec("CREATE SCHEMA IF NOT EXISTS app")
+            exec("CREATE SCHEMA IF NOT EXISTS logs")
+            exec("CREATE SCHEMA IF NOT EXISTS metrics")
+
             SchemaUtils.create(
                 UsersTable,
                 LessonsTable,
@@ -74,22 +76,17 @@ object DatabaseFactory {
                 HomeworksTable,
                 HomeworkQuestionsTable,
                 HomeworkSubmissionsTable,
-                RemindersTable
+                RemindersTable,
+                UserStatesTable,
+                UserProgressTable,
+                UserDictionaryTable,
+                UserCustomDictionaryTable,
+                ReviewCardsTable,
+                ReminderPreferencesTable,
+                AnalyticsEventsTable,
+                UserStatsTable
             )
         }
-    }
-
-    private fun findProjectRoot(): String {
-        var dir = File(System.getProperty("user.dir"))
-        
-        while (dir.parentFile != null) {
-            if (File(dir, "settings.gradle.kts").exists()) {
-                return dir.absolutePath
-            }
-            dir = dir.parentFile
-        }
-        
-        return System.getProperty("user.dir")
     }
 
     /**

@@ -8,7 +8,9 @@ import com.turki.core.repository.HomeworkRepository
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.ResultRow
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 
@@ -86,6 +88,10 @@ class HomeworkRepositoryImpl : HomeworkRepository {
                     (HomeworkSubmissionsTable.score eq HomeworkSubmissionsTable.maxScore)
             }.count() > 0
         }
+
+    override suspend fun deleteSubmissionsByUser(userId: Long): Boolean = DatabaseFactory.dbQuery {
+        HomeworkSubmissionsTable.deleteWhere { HomeworkSubmissionsTable.userId eq userId } > 0
+    }
 
     private fun toHomework(row: ResultRow): Homework = Homework(
         id = row[HomeworksTable.id].value,

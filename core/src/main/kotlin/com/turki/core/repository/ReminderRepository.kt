@@ -77,4 +77,12 @@ interface ReminderRepository {
      * @return true if any reminders were deleted, false otherwise
      */
     suspend fun deleteByUserAndType(userId: Long, type: ReminderType): Boolean
+
+    /**
+     * Deletes all reminders for a specific user.
+     *
+     * @param userId The user's database ID
+     * @return true if any reminders were deleted, false otherwise
+     */
+    suspend fun deleteByUser(userId: Long): Boolean
 }

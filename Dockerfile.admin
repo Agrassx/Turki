@@ -11,10 +11,9 @@ COPY gradle.properties .
 
 COPY core core
 COPY admin admin
-COPY admin-web admin-web
 
 RUN chmod +x gradlew
-RUN ./gradlew :admin-web:jar --no-daemon
+RUN ./gradlew :admin:adminWebJar --no-daemon
 
 FROM eclipse-temurin:21-jre-alpine
 
@@ -24,11 +23,13 @@ RUN apk add --no-cache wget
 
 RUN mkdir -p /app/data
 
-COPY --from=build /app/admin-web/build/libs/*.jar /app/admin.jar
+COPY --from=build /app/admin/build/libs/admin-web.jar /app/admin.jar
 
 EXPOSE 8081
 
-ENV DB_PATH="/app/data/turki.db"
+ENV DB_URL="jdbc:postgresql://postgres:5432/turki"
+ENV DB_USER="turki"
+ENV DB_PASSWORD="turki"
 ENV ADMIN_PORT="8081"
 
 ENTRYPOINT ["java", "-jar", "/app/admin.jar"]

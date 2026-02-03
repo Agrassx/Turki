@@ -37,10 +37,18 @@ Merhaba, $firstName! 👋
 📚 <b>Команды бота:</b>
 
 /start — Начать работу с ботом
+/menu — Меню
+/lessons — Список уроков
+/practice — Практика
+/dictionary — Поиск слов
+/review — Повторение
 /lesson — Текущий урок
 /homework — Домашнее задание
 /vocabulary — Словарь текущего урока
 /progress — Ваш прогресс
+/reminders — Напоминания
+/reset — Сбросить прогресс
+/delete — Удалить данные
 /help — Справка
 
 💡 <b>Как работает обучение:</b>
@@ -69,6 +77,9 @@ Merhaba, $firstName! 👋
 
     override fun vocabularyItem(word: String, translation: String) =
         "• <b>$word</b> — $translation"
+
+    override fun vocabularyWordTitle(word: String, translation: String) =
+        "📖 <b>$word</b> — $translation"
 
     override fun vocabularyPronunciation(pronunciation: String) =
         "  🔊 <i>[$pronunciation]</i>"
@@ -106,16 +117,20 @@ Merhaba, $firstName! 👋
         firstName: String,
         completedLessons: Int,
         totalLessons: Int,
-        subscriptionActive: Boolean
+        subscriptionActive: Boolean,
+        currentLevel: String,
+        streakDays: Int
     ): String {
         val progressBar = buildProgressBar(completedLessons, totalLessons)
-        val subscriptionStatus = if (subscriptionActive) "✅ Активна" else "❌ Неактивна"
+        val subscriptionStatus = if (subscriptionActive) "✅ Активна" else "ℹ️ Можно улучшить"
         return """
 📊 <b>Ваш прогресс, $firstName</b>
 
 Уроков пройдено: $completedLessons из $totalLessons
 $progressBar
 
+Уровень: $currentLevel
+Серия дней: $streakDays 🔥
 Подписка: $subscriptionStatus
         """.trim()
     }
@@ -146,8 +161,124 @@ $progressBar
     override val progressResetSuccess = """
 ✅ <b>Прогресс успешно сброшен!</b>
 
-Теперь вы можете начать обучение заново.
+Можно начать заново с урока 1.
     """.trim()
+
+    override val deleteDataConfirm = """
+⚠️ <b>Удалить все данные?</b>
+
+Это действие удалит ваш прогресс, словарь, повторения и историю занятий.
+    """.trim()
+
+    override val deleteDataSuccess = """
+✅ <b>Данные удалены.</b>
+
+Чтобы начать заново, отправьте /start.
+    """.trim()
+
+    override val homeworkFeedbackPerfect = "✨ Отлично! Ошибок нет."
+
+    override fun homeworkFeedbackSummary(details: String, wrongCount: Int) = """
+Вот что можно улучшить:
+$details
+
+Ошибок: $wrongCount
+    """.trim()
+
+    override fun homeworkCorrectAnswer(answer: String) = "Правильно: <b>$answer</b>"
+
+    override val homeworkNoNext = "Пока нет следующей домашки — вы на последнем уроке."
+
+    override val homeworkContinue = "Продолжим домашку. Ответьте на следующий вопрос."
+
+    override val lessonIntro = "Начинаем урок!"
+
+    override fun lessonIntroTitle(orderIndex: Int, title: String) =
+        "👋 <b>Урок $orderIndex: $title</b>\n\nСначала теория, затем упражнение. Домашка — отдельная проверка."
+
+    override val lessonsTitle = "📚 <b>Уроки</b>"
+
+    override val practiceIntro = "🧩 <b>Практика</b>\n\nНебольшая разминка перед уроком."
+
+    override val practicePrompt = "Готовы? Жмите «Начать практику»."
+
+    override val exerciseNotReady = "Для этого урока пока нет упражнений."
+
+    override fun exercisePrompt(word: String) = "🧩 <b>Упражнение</b>\nПереведи слово: <b>$word</b>"
+
+    override val exerciseCorrect = "✅ Верно!"
+
+    override val exerciseIncorrect = "❌ Неверно."
+
+    override val exerciseComplete = "Готово на сегодня! Продолжим?"
+
+    override val reviewIntro = "🔁 <b>Повторение</b>\n\nКороткая ежедневная серия карточек."
+
+    override val reviewEmpty = "Пока нечего повторять. Добавьте слова в словарь."
+
+    override val reviewDone = "Готово на сегодня! До завтра 👋"
+
+    override fun reviewCardTitle(word: String) = "Карточка: <b>$word</b>"
+
+    override fun reviewCardTranslation(translation: String) = "Перевод: $translation"
+
+    override val dictionaryPrompt = "Введите слово или перевод для поиска."
+
+    override val dictionaryEmpty = "Словарь пуст. Добавьте слова, чтобы было что повторять."
+
+    override val dictionaryAddPrompt = "Введите слово и перевод через тире, например: Merhaba - Привет"
+
+    override val dictionaryAddFormatError = "Не понял формат. Напишите так: слово - перевод"
+
+    override val dictionaryNoResults = "Пока не нашёл это слово. Попробуйте другой запрос."
+
+    override fun dictionaryCardTitle(word: String, translation: String) =
+        "📖 <b>$word</b> — $translation"
+
+    override fun dictionaryPronunciation(pronunciation: String) =
+        "  🔊 <i>[$pronunciation]</i>"
+
+    override fun dictionaryExample(example: String) =
+        "  📝 <i>$example</i>"
+
+    override fun dictionaryTags(tags: String) = "Теги: $tags"
+
+    override val dictionaryTagsEmpty = "нет тегов"
+
+    override val dictionaryTagPrompt = "Выберите теги для слова:"
+
+    override fun dictionaryTagsUpdated(tags: String) = "Теги обновлены: $tags"
+
+    override val dictionaryFavorited = "Сохранено в словарь ⭐️"
+
+    override val dictionaryUnfavorited = "Удалено из избранного"
+
+    override fun dictionaryAddedAll(count: Int) = "Добавлено в словарь: $count"
+
+    override val reminderStatusOff = "Напоминания выключены."
+
+    override fun reminderStatusOn(days: String, time: String) =
+        "Напоминания включены: $days в $time"
+
+    override fun reminderEnabled(days: String, time: String) =
+        "Готово! Буду напоминать: $days в $time."
+
+    override val reminderDisabled = "Ок, напоминания выключены."
+
+    override fun weeklyReport(lessons: Int, practice: Int, review: Int, homework: Int) = """
+📈 <b>Недельный отчёт</b>
+
+Уроки: $lessons
+Практика: $practice
+Повторение: $review
+Домашки: $homework
+
+Продолжим?
+    """.trim()
+
+    override val menuTitle = "🏠 <b>Меню</b>"
+
+    override val continueNothing = "Пока нет активного занятия. Выберите пункт меню."
 
     override val selectLevelTitle = """
 🎯 <b>Выбор уровня</b>
@@ -182,21 +313,44 @@ $progressBar
 Выберите действие:
     """.trim()
     override val btnStartLesson = "📚 Начать урок"
+    override val btnLesson = "Урок"
+    override val btnContinue = "▶️ Продолжить"
     override val btnHomework = "📝 Домашнее задание"
     override val btnProgress = "📊 Мой прогресс"
+    override val btnLessons = "📚 Уроки"
+    override val btnPractice = "🧩 Практика"
+    override val btnDictionary = "📖 Словарь"
+    override val btnReview = "🔁 Повторение"
+    override val btnReminders = "⏰ Напоминания"
+    override val btnHelp = "❓ Помощь"
     override val btnSelectLevel = "🎯 Уровень"
     override val btnKnowledgeTest = "📋 Тест"
     override val btnSettings = "⚙️ Настройки"
     override val btnVocabulary = "📖 Словарь урока"
     override val btnGoToHomework = "📝 Перейти к заданию"
+    override val btnStartPractice = "🧩 Начать практику"
+    override val btnStartReview = "🔁 Начать повторение"
     override val btnSetReminder = "⏰ Напомнить о занятии"
     override val btnStartHomework = "📝 Начать домашнее задание"
     override val btnNextLesson = "➡️ Следующий урок"
+    override val btnNext = "Дальше"
+    override val btnRemember = "Помню"
+    override val btnAgain = "Повторить"
+    override val btnRepeatTopic = "Повторить тему"
+    override val btnNextHomework = "Следующая домашка"
+    override val btnEditTags = "Теги"
+    override val btnAddToDictionary = "➕ В словарь"
+    override val btnAddCustomWord = "➕ Добавить своё слово"
+    override val btnAddAllToDictionary = "➕ Добавить все слова"
+    override val btnRemoveFromDictionary = "🗑️ Удалить из словаря"
+    override val btnEnableWeekdays = "Вкл. Пн–Пт 19:00"
+    override val btnDisableReminders = "Выключить"
     override val btnTryAgain = "🔄 Попробовать снова"
     override val btnResetProgress = "🔄 Сбросить прогресс"
     override val btnBackToMenu = "🔙 Назад в меню"
     override val btnConfirmReset = "✅ Да, сбросить"
     override val btnCancel = "❌ Отмена"
+    override val btnConfirmDelete = "🗑️ Да, удалить"
     override val btnBack = "🔙 Назад"
     override val btnContinueLesson = "📚 Продолжить урок"
 
