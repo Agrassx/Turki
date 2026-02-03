@@ -24,6 +24,7 @@ import com.turki.core.repository.UserProgressRepository
 import com.turki.core.repository.UserStateRepository
 import com.turki.core.repository.UserStatsRepository
 import com.turki.core.repository.ReviewRepository
+import com.turki.core.service.DataImportService
 import org.koin.dsl.module
 
 val coreModule = module {
@@ -39,4 +40,5 @@ val coreModule = module {
     single<ReminderPreferenceRepository> { ReminderPreferenceRepositoryImpl() }
     single<AnalyticsRepository> { AnalyticsRepositoryImpl() }
     single<UserStatsRepository> { UserStatsRepositoryImpl() }
+    single { DataImportService() }
 }

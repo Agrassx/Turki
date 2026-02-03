@@ -4,12 +4,18 @@ import dev.inmo.tgbotapi.extensions.api.send.sendMessage
 import dev.inmo.tgbotapi.extensions.behaviour_builder.BehaviourContext
 import dev.inmo.tgbotapi.types.ChatIdentifier
 import dev.inmo.tgbotapi.types.IdChatIdentifier
+import dev.inmo.tgbotapi.types.buttons.InlineKeyboardMarkup
 import dev.inmo.tgbotapi.types.buttons.KeyboardMarkup
 import dev.inmo.tgbotapi.types.buttons.ReplyKeyboardMarkup
 import dev.inmo.tgbotapi.types.buttons.SimpleKeyboardButton
 import dev.inmo.tgbotapi.types.chat.Chat
 import dev.inmo.tgbotapi.types.chat.User
+import dev.inmo.tgbotapi.extensions.api.delete
+import dev.inmo.tgbotapi.extensions.api.edit.text.editMessageText
 import dev.inmo.tgbotapi.types.message.HTMLParseMode
+import dev.inmo.tgbotapi.types.queries.callback.DataCallbackQuery
+import dev.inmo.tgbotapi.types.queries.callback.MessageDataCallbackQuery
+import org.slf4j.LoggerFactory
 
 /**
  * Converts various Telegram API types to [ChatIdentifier].
@@ -96,30 +102,94 @@ fun Any.toChatId(): ChatIdentifier = when (this) {
 fun String.markdownToHtml(): String {
     var result = this
 
-    result = result.replace(Regex("^\\|[-: ]+\\|$", RegexOption.MULTILINE), "")
+    // Convert markdown tables to readable format
+    result = convertMarkdownTables(result)
 
-    result = result.replace(Regex("^\\|(.+)\\|$", RegexOption.MULTILINE)) { matchResult ->
-        val cells = matchResult.groupValues[1].split("|").map { it.trim() }.filter { it.isNotEmpty() }
-        cells.joinToString(" | ")
-    }
-
+    // Headers (#, ##, ###) -> bold
     result = result.replace(Regex("^#{1,3}\\s+(.+)$", RegexOption.MULTILINE)) { matchResult ->
         "<b>${matchResult.groupValues[1].trim()}</b>"
     }
 
+    // Bold **text** -> <b>text</b>
     result = result.replace(Regex("\\*\\*([^*]+?)\\*\\*")) { matchResult ->
         "<b>${matchResult.groupValues[1]}</b>"
     }
 
+    // Italic *text* -> <i>text</i>
     result = result.replace(Regex("(?<!\\*)\\*([^*\\n]+?)\\*(?!\\*)")) { matchResult ->
         "<i>${matchResult.groupValues[1]}</i>"
     }
 
+    // Lists - item -> • item
     result = result.replace(Regex("^\\s*-\\s+(.+)$", RegexOption.MULTILINE)) { matchResult ->
         "• ${matchResult.groupValues[1]}"
     }
 
     return result
+}
+
+/**
+ * Converts markdown tables to a readable format for Telegram.
+ * Tables are converted to a line-by-line format with the first column bold.
+ *
+ * Example input:
+ * | Турецкий | Произношение | Русский |
+ * |---|---|---|
+ * | Merhaba | мер-ха-ба | Привет |
+ *
+ * Example output:
+ * <b>Merhaba</b> [мер-ха-ба] — Привет
+ */
+private fun convertMarkdownTables(text: String): String {
+    val lines = text.lines()
+    val result = mutableListOf<String>()
+    var headerColumns: List<String>? = null
+    var inTable = false
+
+    for (line in lines) {
+        val trimmed = line.trim()
+
+        // Check if this is a table row
+        if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+            val cells = trimmed
+                .removeSurrounding("|")
+                .split("|")
+                .map { it.trim() }
+
+            // Skip separator rows (|---|---|---|)
+            if (cells.all { it.matches(Regex("^[-:]+$")) }) {
+                inTable = true
+                continue
+            }
+
+            // First row is header
+            if (!inTable && headerColumns == null) {
+                headerColumns = cells
+                inTable = true
+                continue
+            }
+
+            // Data row - format based on column count
+            if (cells.isNotEmpty()) {
+                val formatted = when (cells.size) {
+                    1 -> "<b>${cells[0]}</b>"
+                    2 -> "<b>${cells[0]}</b> — ${cells[1]}"
+                    3 -> "<b>${cells[0]}</b> [${cells[1]}] — ${cells[2]}"
+                    else -> "<b>${cells[0]}</b> — ${cells.drop(1).joinToString(" | ")}"
+                }
+                result.add(formatted)
+            }
+        } else {
+            // Not a table row - reset state and add as-is
+            if (inTable) {
+                headerColumns = null
+                inTable = false
+            }
+            result.add(line)
+        }
+    }
+
+    return result.joinToString("\n")
 }
 
 /**
@@ -143,6 +213,11 @@ fun String.markdownToHtml(): String {
  * )
  * ```
  */
+private val messageLogger = LoggerFactory.getLogger("BotExtensions")
+
+/**
+ * Sends a new HTML message to the chat.
+ */
 suspend fun BehaviourContext.sendHtml(
     chat: Any,
     text: String,
@@ -155,6 +230,54 @@ suspend fun BehaviourContext.sendHtml(
         parseMode = HTMLParseMode,
         replyMarkup = markup
     )
+}
+
+/**
+ * Edits the callback message in place, or sends a new message if editing fails.
+ * This provides a smoother UX by updating instead of creating new messages.
+ */
+suspend fun BehaviourContext.editOrSendHtml(
+    query: DataCallbackQuery,
+    text: String,
+    replyMarkup: InlineKeyboardMarkup? = null
+) {
+    val callbackMessage = (query as? MessageDataCallbackQuery)?.message
+    if (callbackMessage != null) {
+        try {
+            editMessageText(
+                chatId = callbackMessage.chat.id,
+                messageId = callbackMessage.messageId,
+                text = text,
+                parseMode = HTMLParseMode,
+                replyMarkup = replyMarkup
+            )
+            return
+        } catch (e: Exception) {
+            messageLogger.debug("Could not edit message, sending new: ${e.message}")
+        }
+    }
+    // Fallback to sending new message
+    sendHtml(query.from, text, replyMarkup)
+}
+
+/**
+ * Deletes the callback message and sends a new one.
+ * Use this when you want to replace the menu with a fresh message.
+ */
+suspend fun BehaviourContext.replaceWithHtml(
+    query: DataCallbackQuery,
+    text: String,
+    replyMarkup: KeyboardMarkup? = null
+) {
+    val callbackMessage = (query as? MessageDataCallbackQuery)?.message
+    if (callbackMessage != null) {
+        try {
+            delete(callbackMessage)
+        } catch (e: Exception) {
+            messageLogger.debug("Could not delete message: ${e.message}")
+        }
+    }
+    sendHtml(query.from, text, replyMarkup)
 }
 
 fun mainCommandKeyboard(): ReplyKeyboardMarkup = ReplyKeyboardMarkup(

@@ -15,6 +15,7 @@ build/
 # Kotlin
 *.class
 *.kotlin_module
+**/.kotlin
 
 # OS
 .DS_Store
@@ -27,6 +28,7 @@ Thumbs.db
 # Database - не публикуем БД с уроками и пользователями
 data/*.db
 data/*.csv
+data/**/*.webp
 *.sqlite
 *.sqlite3
 **/*.db

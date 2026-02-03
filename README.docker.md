@@ -67,3 +67,73 @@ docker-compose up -d
 ```bash
 ./gradlew :admin:packageDistributionForCurrentOs
 ```
+
+## Импорт данных через API
+
+Обновить уроки, словарь и домашние задания на сервере можно через API админ-панели.
+
+### Импорт уроков
+
+```bash
+curl -u admin:$ADMIN_PASSWORD \
+  -X POST \
+  -H "Content-Type: text/plain" \
+  --data-binary @data/lessons.csv \
+  "http://localhost:8081/api/import/lessons"
+```
+
+### Импорт словаря
+
+```bash
+curl -u admin:$ADMIN_PASSWORD \
+  -X POST \
+  -H "Content-Type: text/plain" \
+  --data-binary @data/vocabulary.csv \
+  "http://localhost:8081/api/import/vocabulary"
+```
+
+### Импорт домашних заданий
+
+```bash
+curl -u admin:$ADMIN_PASSWORD \
+  -X POST \
+  -H "Content-Type: text/plain" \
+  --data-binary @data/homework.csv \
+  "http://localhost:8081/api/import/homework"
+```
+
+### Полное обновление (с очисткой)
+
+Добавьте `?clear=true&confirm=yes` для удаления существующих данных перед импортом:
+
+```bash
+# Полный импорт: сначала уроки, потом словарь и домашка
+curl -u admin:$ADMIN_PASSWORD -X POST --data-binary @lessons.csv \
+  "http://localhost:8081/api/import/lessons?clear=true&confirm=yes"
+
+curl -u admin:$ADMIN_PASSWORD -X POST --data-binary @vocabulary.csv \
+  "http://localhost:8081/api/import/vocabulary?clear=true&confirm=yes"
+
+curl -u admin:$ADMIN_PASSWORD -X POST --data-binary @homework.csv \
+  "http://localhost:8081/api/import/homework?clear=true&confirm=yes"
+```
+
+**Важно:** Параметр `confirm=yes` обязателен при использовании `clear=true`.
+
+### Формат ответа
+
+```json
+{
+  "success": true,
+  "imported": 10,
+  "updated": 3,
+  "errors": []
+}
+```
+
+### Ограничения безопасности
+
+- **Аутентификация**: HTTP Basic Auth (ADMIN_USER/ADMIN_PASSWORD)
+- **Rate limiting**: 10 запросов в минуту
+- **Размер файла**: максимум 10 MB
+- **Очистка данных**: требует подтверждения `confirm=yes`

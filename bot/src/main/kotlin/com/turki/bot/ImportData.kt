@@ -1,6 +1,5 @@
 package com.turki.bot
 
-import com.turki.bot.util.markdownToHtml
 import com.turki.core.database.DatabaseFactory
 import com.turki.core.database.HomeworkQuestionsTable
 import com.turki.core.database.HomeworksTable
@@ -115,8 +114,8 @@ object ImportData {
                     val orderIndex = fields[0].toIntOrNull() ?: continue
                     val targetLanguage = fields[1]
                     val title = fields[2]
-                    val description = fields[3].markdownToHtml()
-                    val content = fields[4].markdownToHtml()
+                    val description = fields[3] // Store raw markdown, convert at display time
+                    val content = fields[4]
                     val level = fields.getOrNull(5)?.takeIf { it.isNotBlank() } ?: "A1"
                     val contentVersion = fields.getOrNull(6)?.takeIf { it.isNotBlank() } ?: "v1"
                     val isActive = fields.getOrNull(7)?.toBooleanStrictOrNull() ?: true

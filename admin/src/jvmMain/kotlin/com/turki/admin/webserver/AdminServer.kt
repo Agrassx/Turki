@@ -7,6 +7,7 @@ import com.turki.core.domain.User as CoreUser
 import com.turki.core.domain.VocabularyItem as CoreVocabularyItem
 import com.turki.core.repository.LessonRepository
 import com.turki.core.repository.UserRepository
+import com.turki.core.service.DataImportService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.http.content.staticResources
 import io.ktor.server.application.Application
@@ -20,7 +21,12 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
+import io.ktor.server.plugins.ratelimit.RateLimit
+import io.ktor.server.plugins.ratelimit.rateLimit
+import io.ktor.server.request.contentLength
 import io.ktor.server.request.receive
+import io.ktor.server.request.receiveText
+import kotlin.time.Duration.Companion.minutes
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
@@ -36,6 +42,7 @@ import org.koin.core.context.startKoin
 import org.koin.java.KoinJavaComponent.inject
 import org.slf4j.LoggerFactory
 
+private const val MAX_IMPORT_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
 private val logger = LoggerFactory.getLogger("AdminServer")
 
 fun main(args: Array<String>) {
@@ -98,8 +105,15 @@ fun Application.adminModule(adminUser: String, adminPassword: String) {
         }
     }
 
+    install(RateLimit) {
+        register {
+            rateLimiter(limit = 10, refillPeriod = 1.minutes)
+        }
+    }
+
     val userRepository: UserRepository by inject(UserRepository::class.java)
     val lessonRepository: LessonRepository by inject(LessonRepository::class.java)
+    val dataImportService: DataImportService by inject(DataImportService::class.java)
 
     routing {
         // Health check - no auth required
@@ -246,6 +260,136 @@ fun Application.adminModule(adminUser: String, adminPassword: String) {
                     call.respond(HttpStatusCode.OK)
                 }
             }
+
+            // Data import endpoints with rate limiting
+            rateLimit {
+                post("/api/import/lessons") {
+                    // Check request size
+                    val contentLength = call.request.contentLength() ?: 0
+                    if (contentLength > MAX_IMPORT_SIZE_BYTES) {
+                        call.respond(
+                            HttpStatusCode.PayloadTooLarge,
+                            ImportResponse(false, 0, 0, listOf("File too large. Max size: 10 MB"))
+                        )
+                        return@post
+                    }
+
+                    val csvContent = call.receiveText()
+                    val clearExisting = call.request.queryParameters["clear"] == "true"
+                    val confirmClear = call.request.queryParameters["confirm"] == "yes"
+
+                    // Require confirmation for destructive clear operation
+                    if (clearExisting && !confirmClear) {
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            ImportResponse(
+                                false, 0, 0,
+                                listOf("Clear operation requires confirmation. Add &confirm=yes")
+                            )
+                        )
+                        return@post
+                    }
+
+                    val result = dataImportService.importLessons(csvContent, clearExisting)
+                    logger.info("Lessons import: ${result.imported} imported, ${result.updated} updated")
+
+                    call.respond(
+                        if (result.success) HttpStatusCode.OK else HttpStatusCode.BadRequest,
+                        ImportResponse(
+                            success = result.success,
+                            imported = result.imported,
+                            updated = result.updated,
+                            errors = result.errors
+                        )
+                    )
+                }
+
+                post("/api/import/vocabulary") {
+                    val contentLength = call.request.contentLength() ?: 0
+                    if (contentLength > MAX_IMPORT_SIZE_BYTES) {
+                        call.respond(
+                            HttpStatusCode.PayloadTooLarge,
+                            ImportResponse(false, 0, 0, listOf("File too large. Max size: 10 MB"))
+                        )
+                        return@post
+                    }
+
+                    val csvContent = call.receiveText()
+                    val clearExisting = call.request.queryParameters["clear"] == "true"
+                    val confirmClear = call.request.queryParameters["confirm"] == "yes"
+
+                    if (clearExisting && !confirmClear) {
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            ImportResponse(
+                                false, 0, 0,
+                                listOf("Clear operation requires confirmation. Add &confirm=yes")
+                            )
+                        )
+                        return@post
+                    }
+
+                    val result = dataImportService.importVocabulary(csvContent, clearExisting)
+                    logger.info("Vocabulary import: ${result.imported} imported")
+
+                    call.respond(
+                        if (result.success) HttpStatusCode.OK else HttpStatusCode.BadRequest,
+                        ImportResponse(
+                            success = result.success,
+                            imported = result.imported,
+                            updated = result.updated,
+                            errors = result.errors
+                        )
+                    )
+                }
+
+                post("/api/import/homework") {
+                    val contentLength = call.request.contentLength() ?: 0
+                    if (contentLength > MAX_IMPORT_SIZE_BYTES) {
+                        call.respond(
+                            HttpStatusCode.PayloadTooLarge,
+                            ImportResponse(false, 0, 0, listOf("File too large. Max size: 10 MB"))
+                        )
+                        return@post
+                    }
+
+                    val csvContent = call.receiveText()
+                    val clearExisting = call.request.queryParameters["clear"] == "true"
+                    val confirmClear = call.request.queryParameters["confirm"] == "yes"
+
+                    if (clearExisting && !confirmClear) {
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            ImportResponse(
+                                false, 0, 0,
+                                listOf("Clear operation requires confirmation. Add &confirm=yes")
+                            )
+                        )
+                        return@post
+                    }
+
+                    val result = dataImportService.importHomework(csvContent, clearExisting)
+                    logger.info("Homework import: ${result.imported} imported")
+
+                    call.respond(
+                        if (result.success) HttpStatusCode.OK else HttpStatusCode.BadRequest,
+                        ImportResponse(
+                            success = result.success,
+                            imported = result.imported,
+                            updated = result.updated,
+                            errors = result.errors
+                        )
+                    )
+                }
+            }
         }
     }
 }
+
+@Serializable
+data class ImportResponse(
+    val success: Boolean,
+    val imported: Int,
+    val updated: Int,
+    val errors: List<String>
+)

@@ -16,7 +16,9 @@ import com.turki.bot.service.UserFlowState
 import com.turki.bot.service.UserDataService
 import com.turki.bot.service.ExerciseFlowPayload
 import com.turki.bot.service.ReviewFlowPayload
+import com.turki.bot.util.editOrSendHtml
 import com.turki.bot.util.markdownToHtml
+import com.turki.bot.util.replaceWithHtml
 import com.turki.bot.util.sendHtml
 import com.turki.core.domain.Language
 import com.turki.core.domain.QuestionType
@@ -186,8 +188,9 @@ class CallbackHandler(
             }
         }
 
-        context.sendHtml(
-            query.from,
+        // Edit in place for smooth pagination
+        context.editOrSendHtml(
+            query,
             if (totalPages > 1) "${S.lessonsTitle}\n\nСтраница ${safePage + 1}/$totalPages" else S.lessonsTitle,
             replyMarkup = InlineKeyboardMarkup(
                 buttons + listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
@@ -199,9 +202,13 @@ class CallbackHandler(
     }
 
     private fun extractLessonTopic(title: String): String {
-        val first = title.trim().split(Regex("\\s+")).firstOrNull().orEmpty()
-        val cleaned = first.trim { ch -> !ch.isLetterOrDigit() }
-        return if (cleaned.isNotBlank()) cleaned else title.take(20)
+        // Take text before colon or first 25 chars, whichever is shorter
+        val beforeColon = title.substringBefore(":").trim()
+        return if (beforeColon.length <= 25) {
+            beforeColon
+        } else {
+            beforeColon.take(22) + "..."
+        }
     }
 
     private suspend fun handleLessonStart(
@@ -277,8 +284,9 @@ class CallbackHandler(
         buttons.add(listOf(dataInlineButton(S.btnAddAllToDictionary, "vocab_add_all:$lessonId")))
         buttons.add(listOf(dataInlineButton(S.btnBack, "lesson_start:$lessonId")))
 
-        context.sendHtml(
-            query.from,
+        // Edit in place for smoother navigation
+        context.editOrSendHtml(
+            query,
             S.vocabularyForLesson(lessonId),
             replyMarkup = InlineKeyboardMarkup(buttons)
         )
@@ -313,8 +321,9 @@ class CallbackHandler(
             add(listOf(dataInlineButton(S.btnBack, "vocab_list:$lessonId")))
         }
 
-        context.sendHtml(
-            query.from,
+        // Edit in place for smoother navigation
+        context.editOrSendHtml(
+            query,
             text,
             replyMarkup = InlineKeyboardMarkup(buttons)
         )
@@ -330,8 +339,8 @@ class CallbackHandler(
         }
         val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
         val vocabIds = lessonService.getVocabulary(lessonId).map { it.id }
-        val added = dictionaryService.addAllFavorites(user.id, vocabIds)
-        context.sendHtml(query.from, S.dictionaryAddedAll(added))
+        dictionaryService.addAllFavorites(user.id, vocabIds)
+        // Go directly back to vocabulary list with stars updated (no intermediate message)
         handleVocabularyList(context, query, lessonId)
     }
 
@@ -535,8 +544,8 @@ class CallbackHandler(
         val pageEntries = entries.drop(safePage * perPage).take(perPage)
 
         if (pageEntries.isEmpty()) {
-            context.sendHtml(
-                query.from,
+            context.editOrSendHtml(
+                query,
                 S.dictionaryEmpty,
                 replyMarkup = InlineKeyboardMarkup(
                     listOf(
@@ -576,8 +585,9 @@ class CallbackHandler(
             add(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
         }
 
-        context.sendHtml(
-            query.from,
+        // Edit in place for smooth pagination
+        context.editOrSendHtml(
+            query,
             text,
             replyMarkup = InlineKeyboardMarkup(buttons)
         )
@@ -843,8 +853,9 @@ class CallbackHandler(
 
         when (question.questionType) {
             QuestionType.MULTIPLE_CHOICE -> {
+                // Only send index in callback to avoid 64-byte limit and colon parsing issues
                 val buttons = question.options.mapIndexed { optIndex, option ->
-                    listOf(dataInlineButton(option, "answer:$homeworkId:${question.id}:$optIndex:$option"))
+                    listOf(dataInlineButton(option, "answer:$homeworkId:${question.id}:$optIndex"))
                 }
                 context.sendHtml(
                     query.from,
@@ -868,21 +879,26 @@ class CallbackHandler(
         query: DataCallbackQuery,
         parts: List<String>
     ) {
-        if (parts.size < 5) {
+        // Format: answer:homeworkId:questionId:optionIndex
+        if (parts.size < 4) {
             return
         }
 
         val homeworkId = parts[1].toIntOrNull() ?: return
         val questionId = parts[2].toIntOrNull() ?: return
-        val answer = parts[4]
+        val optionIndex = parts[3].toIntOrNull() ?: return
 
         val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val homework = homeworkService.getHomeworkForLesson(user.currentLessonId) ?: return
+        val question = homework.questions.firstOrNull { it.id == questionId } ?: return
+
+        // Get the answer text from the question options by index
+        val answer = question.options.getOrNull(optionIndex) ?: return
+
         val currentAnswers = HomeworkStateManager.getAnswers(user.telegramId)
         currentAnswers[questionId] = answer
         HomeworkStateManager.setAnswers(user.telegramId, currentAnswers)
 
-        val homework = homeworkService.getHomeworkForLesson(user.currentLessonId) ?: return
-        val question = homework.questions.firstOrNull { it.id == questionId } ?: return
         val currentIndex = homework.questions.indexOfFirst { it.id == questionId }
 
         val isCorrect = homeworkService.isAnswerCorrect(question, answer)
