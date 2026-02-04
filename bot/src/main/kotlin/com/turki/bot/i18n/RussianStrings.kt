@@ -1,5 +1,6 @@
 package com.turki.bot.i18n
 
+@Suppress("TooManyFunctions")
 object RussianStrings : Strings {
     override fun welcome(firstName: String) = """
 Merhaba, $firstName! 👋
@@ -216,11 +217,26 @@ $details
 
     override val reviewEmpty = "Пока нечего повторять. Добавьте слова в словарь."
 
-    override val reviewDone = "Готово на сегодня! До завтра 👋"
+    override val reviewDone = "🎉 <b>Отлично!</b>\n\nПовторение завершено. До следующего раза! 👋"
+
+    override val reviewSelectDifficulty = """
+🔁 <b>Повторение</b>
+
+Выберите режим тренировки:
+    """.trim()
+
+    override val reviewDifficultyWarmup = "☕ Разминка (10 вопросов)"
+    override val reviewDifficultyTraining = "💪 Тренировка (20 вопросов)"
+    override val reviewDifficultyMarathon = "🔥 Марафон (30 вопросов)"
+
+    override fun reviewProgress(current: Int, total: Int) = "Вопрос $current из $total"
 
     override fun reviewCardTitle(word: String) = "Карточка: <b>$word</b>"
 
     override fun reviewCardTranslation(translation: String) = "Перевод: $translation"
+
+    override val reviewTranslateToTurkish = "🇹🇷 Переведите на турецкий:"
+    override val reviewTranslateToRussian = "🇷🇺 Переведите на русский:"
 
     override val dictionaryPrompt = "Введите слово или перевод для поиска."
 
@@ -264,6 +280,39 @@ $details
         "Готово! Буду напоминать: $days в $time."
 
     override val reminderDisabled = "Ок, напоминания выключены."
+
+    override val reminderSelectFrequency = """
+⏰ <b>Настройка напоминаний</b>
+
+Как часто напоминать о занятиях?
+    """.trim()
+
+    override val reminderFrequencyDaily = "🌟 Каждый день"
+    override val reminderFrequency1x = "1️⃣ Раз в неделю"
+    override val reminderFrequency2x = "2️⃣ Два раза в неделю"
+    override val reminderFrequency3x = "3️⃣ Три раза в неделю"
+    override val reminderFrequency4x = "4️⃣ Четыре раза в неделю"
+
+    override val reminderSelectDays = """
+📅 <b>Выберите дни недели</b>
+
+Нажмите на дни, когда хотите получать напоминания.
+Выбранные дни отмечены ✅
+    """.trim()
+
+    override val reminderSelectTime = """
+🕐 <b>Выберите время</b>
+
+В какое время дня напоминать?
+    """.trim()
+
+    override val reminderTimeMorning = "🌅 Утро (08:00)"
+    override val reminderTimeDay = "☀️ День (14:00)"
+    override val reminderTimeEvening = "🌆 Вечер (20:00)"
+    override val reminderTimeNight = "🌙 Ночь (00:00)"
+
+    override fun reminderDaysSelected(count: Int, needed: Int) =
+        "Выбрано: $count из $needed"
 
     override fun weeklyReport(lessons: Int, practice: Int, review: Int, homework: Int) = """
 📈 <b>Недельный отчёт</b>
@@ -345,6 +394,15 @@ $details
     override val btnRemoveFromDictionary = "🗑️ Удалить из словаря"
     override val btnEnableWeekdays = "Вкл. Пн–Пт 19:00"
     override val btnDisableReminders = "Выключить"
+    override val btnConfigureReminders = "⚙️ Настроить"
+    override val btnMon = "Пн"
+    override val btnTue = "Вт"
+    override val btnWed = "Ср"
+    override val btnThu = "Чт"
+    override val btnFri = "Пт"
+    override val btnSat = "Сб"
+    override val btnSun = "Вс"
+    override val btnConfirmDays = "✅ Готово"
     override val btnTryAgain = "🔄 Попробовать снова"
     override val btnResetProgress = "🔄 Сбросить прогресс"
     override val btnBackToMenu = "🔙 Назад в меню"

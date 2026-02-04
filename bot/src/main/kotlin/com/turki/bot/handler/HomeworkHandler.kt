@@ -10,6 +10,7 @@ import com.turki.bot.service.UserFlowState
 import com.turki.bot.util.sendHtml
 import com.turki.core.domain.Language
 import com.turki.core.domain.QuestionType
+import dev.inmo.tgbotapi.extensions.api.delete
 import dev.inmo.tgbotapi.extensions.behaviour_builder.BehaviourContext
 import dev.inmo.tgbotapi.extensions.utils.extensions.raw.from
 import dev.inmo.tgbotapi.types.buttons.InlineKeyboardMarkup
@@ -61,6 +62,13 @@ class HomeworkHandler(private val homeworkService: HomeworkService) {
         val answers = HomeworkStateManager.getAnswers(telegramId)
         answers[questionId] = answer
         HomeworkStateManager.setAnswers(telegramId, answers)
+
+        // Delete user's answer message for cleaner chat
+        try {
+            context.delete(message)
+        } catch (e: Exception) {
+            logger.debug("Could not delete user message: ${e.message}")
+        }
 
         val user = userService.findByTelegramId(telegramId) ?: run {
             logger.warn("handleTextAnswer: user not found for telegramId=$telegramId")

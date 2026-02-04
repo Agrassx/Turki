@@ -16,6 +16,9 @@ import com.turki.bot.service.UserFlowState
 import com.turki.bot.service.UserDataService
 import com.turki.bot.service.ExerciseFlowPayload
 import com.turki.bot.service.ReviewFlowPayload
+import com.turki.bot.service.ReviewSessionPayload
+import com.turki.bot.service.ReviewDifficulty
+import com.turki.bot.service.TranslationDirection
 import com.turki.bot.util.editOrSendHtml
 import com.turki.bot.util.markdownToHtml
 import com.turki.bot.util.replaceWithHtml
@@ -53,6 +56,7 @@ private val logger = LoggerFactory.getLogger("CallbackHandler")
  *
  * All callbacks are processed asynchronously and send HTML-formatted responses.
  */
+@Suppress("TooManyFunctions")
 class CallbackHandler(
     private val userService: UserService,
     private val lessonService: LessonService,
@@ -69,6 +73,7 @@ class CallbackHandler(
 ) {
     private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
 
+    @Suppress("CyclomaticComplexMethod")
     suspend fun handleCallback(context: BehaviourContext, query: DataCallbackQuery) {
         val data = query.data
         val parts = data.split(":")
@@ -113,10 +118,17 @@ class CallbackHandler(
             "dict_tag" -> handleDictionaryTagToggle(context, query, parts)
             "dict_add_custom" -> handleDictionaryAddCustom(context, query)
             "review_start" -> handleReviewStart(context, query)
+            "review_difficulty" -> handleReviewDifficulty(context, query, parts.getOrNull(1))
+            "review_session_answer" -> handleReviewSessionAnswer(context, query, parts)
+            "review_session_next" -> handleReviewSessionNext(context, query)
             "review_answer" -> handleReviewAnswer(context, query, parts)
             "hw_next" -> handleHomeworkNext(context, query, parts)
             "hw_add_dict" -> handleHomeworkAddDictionary(context, query, parts)
             "reminders" -> handleReminders(context, query)
+            "reminder_frequency" -> handleReminderFrequency(context, query, parts.getOrNull(1))
+            "reminder_day_toggle" -> handleReminderDayToggle(context, query, parts)
+            "reminder_days_confirm" -> handleReminderDaysConfirm(context, query, parts)
+            "reminder_time" -> handleReminderTime(context, query, parts.getOrNull(1))
             "reminder_enable_weekdays" -> handleReminderEnableWeekdays(context, query)
             "reminder_disable" -> handleReminderDisable(context, query)
             "help" -> handleHelp(context, query)
@@ -716,8 +728,43 @@ class CallbackHandler(
             logger.warn("handleReviewStart: user not found for telegramId=$telegramId")
             return
         }
-        val queue = reviewService.buildQueue(user.id, limit = 12, currentLessonId = user.currentLessonId)
-        if (queue.isEmpty()) {
+
+        // Show difficulty selection menu
+        context.editOrSendHtml(
+            query,
+            S.reviewSelectDifficulty,
+            replyMarkup = InlineKeyboardMarkup(
+                listOf(
+                    listOf(dataInlineButton(S.reviewDifficultyWarmup, "review_difficulty:WARMUP")),
+                    listOf(dataInlineButton(S.reviewDifficultyTraining, "review_difficulty:TRAINING")),
+                    listOf(dataInlineButton(S.reviewDifficultyMarathon, "review_difficulty:MARATHON")),
+                    listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
+                )
+            )
+        )
+    }
+
+    private suspend fun handleReviewDifficulty(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        difficultyStr: String?
+    ) {
+        val telegramId = query.from.id.chatId.long
+        val difficulty = try {
+            difficultyStr?.let { ReviewDifficulty.valueOf(it) } ?: ReviewDifficulty.WARMUP
+        } catch (e: IllegalArgumentException) {
+            logger.warn("handleReviewDifficulty: invalid difficulty '$difficultyStr': ${e.message}")
+            ReviewDifficulty.WARMUP
+        }
+
+        val user = userService.findByTelegramId(telegramId) ?: run {
+            logger.warn("handleReviewDifficulty: user not found for telegramId=$telegramId")
+            return
+        }
+
+        val session = reviewService.buildReviewSession(user.id, user.currentLessonId, difficulty)
+
+        if (session.questions.isEmpty()) {
             context.editOrSendHtml(
                 query,
                 S.reviewEmpty,
@@ -728,13 +775,182 @@ class CallbackHandler(
             return
         }
 
-        val payload = ReviewFlowPayload(
-            vocabularyIds = queue.map { it.id },
-            index = 0
+        userStateService.set(user.id, UserFlowState.REVIEW.name, json.encodeToString(session))
+        analyticsService.log("review_started", user.id, props = mapOf("difficulty" to difficulty.name))
+        sendReviewSessionQuestion(context, query, session)
+    }
+
+    private suspend fun sendReviewSessionQuestion(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        session: ReviewSessionPayload
+    ) {
+        val question = session.questions.getOrNull(session.currentIndex) ?: return
+        val progress = S.reviewProgress(session.currentIndex + 1, session.questions.size)
+
+        val directionLabel = when (question.direction) {
+            TranslationDirection.RU_TO_TR -> S.reviewTranslateToTurkish
+            TranslationDirection.TR_TO_RU -> S.reviewTranslateToRussian
+        }
+
+        val text = buildString {
+            appendLine("<b>$progress</b>")
+            appendLine()
+            appendLine(directionLabel)
+            appendLine()
+            appendLine("<code>${question.questionText}</code>")
+        }
+
+        val buttons = if (question.options != null) {
+            question.options.mapIndexed { idx, option ->
+                listOf(dataInlineButton(option, "review_session_answer:$idx"))
+            }
+        } else {
+            // For text input questions, show a hint button
+            listOf(listOf(dataInlineButton("💡 Показать ответ", "review_session_answer:show")))
+        }
+
+        context.editOrSendHtml(
+            query,
+            text,
+            replyMarkup = InlineKeyboardMarkup(buttons)
         )
-        userStateService.set(user.id, UserFlowState.REVIEW.name, json.encodeToString(payload))
-        analyticsService.log("review_started", user.id)
-        sendReviewCard(context, query, payload)
+    }
+
+    private suspend fun handleReviewSessionAnswer(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        parts: List<String>
+    ) {
+        val telegramId = query.from.id.chatId.long
+        if (parts.size < 2) {
+            logger.warn("handleReviewSessionAnswer: invalid parts count ${parts.size}")
+            return
+        }
+
+        val user = userService.findByTelegramId(telegramId) ?: run {
+            logger.warn("handleReviewSessionAnswer: user not found for telegramId=$telegramId")
+            return
+        }
+
+        val state = userStateService.get(user.id) ?: run {
+            logger.warn("handleReviewSessionAnswer: no state for user=${user.id}")
+            return
+        }
+
+        if (state.state != UserFlowState.REVIEW.name) {
+            logger.warn("handleReviewSessionAnswer: wrong state '${state.state}'")
+            return
+        }
+
+        val session = try {
+            json.decodeFromString<ReviewSessionPayload>(state.payload)
+        } catch (e: Exception) {
+            // Try legacy format
+            logger.debug("handleReviewSessionAnswer: trying legacy format: ${e.message}")
+            handleReviewAnswer(context, query, parts)
+            return
+        }
+
+        val question = session.questions.getOrNull(session.currentIndex) ?: return
+        val answerIdx = parts[1].toIntOrNull()
+
+        val isCorrect = if (answerIdx != null && question.options != null) {
+            val selectedAnswer = question.options.getOrNull(answerIdx) ?: ""
+            selectedAnswer == question.correctAnswer
+        } else {
+            // Show answer mode - mark as incorrect for spaced repetition
+            false
+        }
+
+        // Update spaced repetition if this is a vocabulary question
+        if (question.sourceType == com.turki.bot.service.ReviewSourceType.VOCABULARY ||
+            question.sourceType == com.turki.bot.service.ReviewSourceType.USER_DICTIONARY) {
+            reviewService.updateCard(user.id, question.sourceId, isCorrect)
+        }
+
+        progressService.recordReview(user.id)
+
+        val newCorrectCount = if (isCorrect) session.correctCount + 1 else session.correctCount
+        val nextIndex = session.currentIndex + 1
+
+        if (nextIndex >= session.questions.size) {
+            // Session complete
+            userStateService.clear(user.id)
+            val resultText = buildString {
+                appendLine(S.reviewDone)
+                appendLine()
+                appendLine("✅ Правильных ответов: $newCorrectCount из ${session.questions.size}")
+            }
+            context.editOrSendHtml(
+                query,
+                resultText,
+                replyMarkup = InlineKeyboardMarkup(
+                    listOf(
+                        listOf(dataInlineButton(S.btnTryAgain, "review_start")),
+                        listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
+                    )
+                )
+            )
+            analyticsService.log("review_completed", user.id, props = mapOf(
+                "correct" to newCorrectCount.toString(),
+                "total" to session.questions.size.toString()
+            ))
+            return
+        }
+
+        // Show result and continue
+        val resultEmoji = if (isCorrect) "✅" else "❌"
+        val resultText = buildString {
+            appendLine("$resultEmoji ${if (isCorrect) "Верно!" else "Неверно"}")
+            if (!isCorrect) {
+                appendLine()
+                appendLine("Правильный ответ: <b>${question.correctAnswer}</b>")
+            }
+        }
+
+        // Update session state
+        val nextSession = session.copy(
+            currentIndex = nextIndex,
+            correctCount = newCorrectCount
+        )
+        userStateService.set(user.id, UserFlowState.REVIEW.name, json.encodeToString(nextSession))
+
+        // Show result briefly then next question
+        context.editOrSendHtml(
+            query,
+            resultText,
+            replyMarkup = InlineKeyboardMarkup(
+                listOf(listOf(dataInlineButton(S.btnNext, "review_session_next")))
+            )
+        )
+    }
+
+    private suspend fun handleReviewSessionNext(context: BehaviourContext, query: DataCallbackQuery) {
+        val telegramId = query.from.id.chatId.long
+        val user = userService.findByTelegramId(telegramId) ?: run {
+            logger.warn("handleReviewSessionNext: user not found for telegramId=$telegramId")
+            return
+        }
+
+        val state = userStateService.get(user.id) ?: run {
+            logger.warn("handleReviewSessionNext: no state for user=${user.id}")
+            return
+        }
+
+        if (state.state != UserFlowState.REVIEW.name) {
+            logger.warn("handleReviewSessionNext: wrong state '${state.state}'")
+            return
+        }
+
+        val session = try {
+            json.decodeFromString<ReviewSessionPayload>(state.payload)
+        } catch (e: Exception) {
+            logger.warn("handleReviewSessionNext: failed to parse session: ${e.message}")
+            return
+        }
+
+        sendReviewSessionQuestion(context, query, session)
     }
 
     private suspend fun handleReviewAnswer(
@@ -826,6 +1042,7 @@ class CallbackHandler(
             status,
             replyMarkup = InlineKeyboardMarkup(
                 listOf(
+                    listOf(dataInlineButton(S.btnConfigureReminders, "reminder_frequency:menu")),
                     listOf(dataInlineButton(S.btnEnableWeekdays, "reminder_enable_weekdays")),
                     listOf(dataInlineButton(S.btnDisableReminders, "reminder_disable")),
                     listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
@@ -834,13 +1051,171 @@ class CallbackHandler(
         )
     }
 
+    private suspend fun handleReminderFrequency(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        frequency: String?
+    ) {
+        val telegramId = query.from.id.chatId.long
+        val user = userService.findByTelegramId(telegramId) ?: return
+
+        when (frequency) {
+            "menu" -> {
+                // Show frequency selection menu
+                context.editOrSendHtml(
+                    query,
+                    S.reminderSelectFrequency,
+                    replyMarkup = InlineKeyboardMarkup(
+                        listOf(
+                            listOf(dataInlineButton(S.reminderFrequencyDaily, "reminder_frequency:daily")),
+                            listOf(dataInlineButton(S.reminderFrequency4x, "reminder_frequency:4")),
+                            listOf(dataInlineButton(S.reminderFrequency3x, "reminder_frequency:3")),
+                            listOf(dataInlineButton(S.reminderFrequency2x, "reminder_frequency:2")),
+                            listOf(dataInlineButton(S.reminderFrequency1x, "reminder_frequency:1")),
+                            listOf(dataInlineButton(S.btnBack, "reminders"))
+                        )
+                    )
+                )
+            }
+            "daily" -> {
+                // Daily - go directly to time selection
+                showTimeSelection(context, query, "MON,TUE,WED,THU,FRI,SAT,SUN")
+            }
+            "1", "2", "3", "4" -> {
+                // Show day selection for 1-4 times per week
+                val needed = frequency.toInt()
+                showDaySelection(context, query, emptySet(), needed)
+            }
+            else -> handleReminders(context, query)
+        }
+    }
+
+    private suspend fun showDaySelection(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        selectedDays: Set<String>,
+        needed: Int
+    ) {
+        val dayButtons = listOf(
+            "MON" to S.btnMon,
+            "TUE" to S.btnTue,
+            "WED" to S.btnWed,
+            "THU" to S.btnThu,
+            "FRI" to S.btnFri,
+            "SAT" to S.btnSat,
+            "SUN" to S.btnSun
+        )
+
+        val buttons = dayButtons.chunked(4).map { row ->
+            row.map { (code, label) ->
+                val isSelected = selectedDays.contains(code)
+                val displayLabel = if (isSelected) "✅ $label" else label
+                dataInlineButton(displayLabel, "reminder_day_toggle:$needed:$code:${selectedDays.joinToString(",")}")
+            }
+        }.toMutableList()
+
+        // Add confirm button if enough days selected
+        if (selectedDays.size == needed) {
+            buttons.add(listOf(dataInlineButton(S.btnConfirmDays, "reminder_days_confirm:${selectedDays.joinToString(",")}")))
+        }
+        buttons.add(listOf(dataInlineButton(S.btnBack, "reminder_frequency:menu")))
+
+        val text = "${S.reminderSelectDays}\n\n${S.reminderDaysSelected(selectedDays.size, needed)}"
+        context.editOrSendHtml(query, text, replyMarkup = InlineKeyboardMarkup(buttons))
+    }
+
+    private suspend fun handleReminderDayToggle(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        parts: List<String>
+    ) {
+        if (parts.size < 4) return
+        val needed = parts[1].toIntOrNull() ?: return
+        val day = parts[2]
+        val currentDays = parts[3].split(",").filter { it.isNotEmpty() }.toMutableSet()
+
+        if (currentDays.contains(day)) {
+            currentDays.remove(day)
+        } else if (currentDays.size < needed) {
+            currentDays.add(day)
+        }
+
+        showDaySelection(context, query, currentDays, needed)
+    }
+
+    private suspend fun handleReminderDaysConfirm(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        parts: List<String>
+    ) {
+        if (parts.size < 2) return
+        val days = parts[1]
+        showTimeSelection(context, query, days)
+    }
+
+    private suspend fun showTimeSelection(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        days: String
+    ) {
+        // Use | as separator since days contain commas
+        context.editOrSendHtml(
+            query,
+            S.reminderSelectTime,
+            replyMarkup = InlineKeyboardMarkup(
+                listOf(
+                    listOf(dataInlineButton(S.reminderTimeMorning, "reminder_time:$days|08:00")),
+                    listOf(dataInlineButton(S.reminderTimeDay, "reminder_time:$days|14:00")),
+                    listOf(dataInlineButton(S.reminderTimeEvening, "reminder_time:$days|20:00")),
+                    listOf(dataInlineButton(S.reminderTimeNight, "reminder_time:$days|00:00")),
+                    listOf(dataInlineButton(S.btnBack, "reminder_frequency:menu"))
+                )
+            )
+        )
+    }
+
+    private suspend fun handleReminderTime(
+        context: BehaviourContext,
+        query: DataCallbackQuery,
+        data: String?
+    ) {
+        if (data == null) return
+        val parts = data.split("|")
+        if (parts.size < 2) return
+
+        val days = parts[0]
+        val time = parts[1]
+
+        val telegramId = query.from.id.chatId.long
+        val user = userService.findByTelegramId(telegramId) ?: return
+
+        val pref = reminderPreferenceService.setSchedule(user.id, days, time)
+        analyticsService.log("reminder_set", user.id, props = mapOf("schedule" to "${pref.daysOfWeek} ${pref.timeLocal}"))
+
+        context.editOrSendHtml(
+            query,
+            S.reminderEnabled(formatDaysForDisplay(pref.daysOfWeek), pref.timeLocal),
+            replyMarkup = InlineKeyboardMarkup(
+                listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
+            )
+        )
+    }
+
+    private fun formatDaysForDisplay(days: String): String {
+        val dayMap = mapOf(
+            "MON" to "Пн", "TUE" to "Вт", "WED" to "Ср",
+            "THU" to "Чт", "FRI" to "Пт", "SAT" to "Сб", "SUN" to "Вс"
+        )
+        return days.split(",").mapNotNull { dayMap[it] }.joinToString(", ")
+    }
+
     private suspend fun handleReminderEnableWeekdays(context: BehaviourContext, query: DataCallbackQuery) {
         val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
         val pref = reminderPreferenceService.setSchedule(user.id, "MON,TUE,WED,THU,FRI", "19:00")
         analyticsService.log("reminder_set", user.id, props = mapOf("schedule" to "${pref.daysOfWeek} ${pref.timeLocal}"))
         context.editOrSendHtml(
             query,
-            S.reminderEnabled(pref.daysOfWeek, pref.timeLocal),
+            S.reminderEnabled(formatDaysForDisplay(pref.daysOfWeek), pref.timeLocal),
             replyMarkup = InlineKeyboardMarkup(
                 listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
             )

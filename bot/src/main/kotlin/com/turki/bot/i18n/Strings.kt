@@ -16,6 +16,7 @@ package com.turki.bot.i18n
  * Implementations should provide localized strings for each supported language.
  * All strings support HTML formatting for Telegram's HTML parse mode.
  */
+@Suppress("TooManyFunctions")
 interface Strings {
     fun welcome(firstName: String): String
     val notRegistered: String
@@ -67,8 +68,15 @@ interface Strings {
     val reviewIntro: String
     val reviewEmpty: String
     val reviewDone: String
+    val reviewSelectDifficulty: String
+    val reviewDifficultyWarmup: String
+    val reviewDifficultyTraining: String
+    val reviewDifficultyMarathon: String
+    fun reviewProgress(current: Int, total: Int): String
     fun reviewCardTitle(word: String): String
     fun reviewCardTranslation(translation: String): String
+    val reviewTranslateToTurkish: String
+    val reviewTranslateToRussian: String
     val dictionaryPrompt: String
     val dictionaryEmpty: String
     val dictionaryAddPrompt: String
@@ -88,6 +96,19 @@ interface Strings {
     fun reminderStatusOn(days: String, time: String): String
     fun reminderEnabled(days: String, time: String): String
     val reminderDisabled: String
+    val reminderSelectFrequency: String
+    val reminderFrequencyDaily: String
+    val reminderFrequency1x: String
+    val reminderFrequency2x: String
+    val reminderFrequency3x: String
+    val reminderFrequency4x: String
+    val reminderSelectDays: String
+    val reminderSelectTime: String
+    val reminderTimeMorning: String
+    val reminderTimeDay: String
+    val reminderTimeEvening: String
+    val reminderTimeNight: String
+    fun reminderDaysSelected(count: Int, needed: Int): String
     fun weeklyReport(lessons: Int, practice: Int, review: Int, homework: Int): String
     val menuTitle: String
     val continueNothing: String
@@ -131,6 +152,15 @@ interface Strings {
     val btnRemoveFromDictionary: String
     val btnEnableWeekdays: String
     val btnDisableReminders: String
+    val btnConfigureReminders: String
+    val btnMon: String
+    val btnTue: String
+    val btnWed: String
+    val btnThu: String
+    val btnFri: String
+    val btnSat: String
+    val btnSun: String
+    val btnConfirmDays: String
     val btnTryAgain: String
     val btnResetProgress: String
     val btnBackToMenu: String

@@ -23,7 +23,7 @@ val botModule = module {
     single { ExerciseService(get()) }
     single { ProgressService(get(), get(), get()) }
     single { DictionaryService(get(), get(), get()) }
-    single { ReviewService(get(), get(), get()) }
+    single { ReviewService(get(), get(), get(), get()) }
     single { ReminderPreferenceService(get()) }
     single { AnalyticsService(get()) }
     single { UserDataService(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
