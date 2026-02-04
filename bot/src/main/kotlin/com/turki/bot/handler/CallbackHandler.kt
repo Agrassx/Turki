@@ -201,6 +201,7 @@ class CallbackHandler(
         }
     }
 
+    @Suppress("MagicNumber")
     private fun extractLessonTopic(title: String): String {
         // Take text before colon or first 25 chars, whichever is shorter
         val beforeColon = title.substringBefore(":").trim()
@@ -269,7 +270,13 @@ class CallbackHandler(
 
         val vocabulary = lessonService.getVocabulary(lessonId)
         if (vocabulary.isEmpty()) {
-            context.sendHtml(query.from, S.vocabularyEmpty)
+            context.editOrSendHtml(
+                query,
+                S.vocabularyEmpty,
+                replyMarkup = InlineKeyboardMarkup(
+                    listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
+                )
+            )
             return
         }
 
@@ -596,7 +603,13 @@ class CallbackHandler(
     private suspend fun handleDictionaryAddCustom(context: BehaviourContext, query: DataCallbackQuery) {
         val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
         userStateService.set(user.id, UserFlowState.DICT_ADD_CUSTOM.name, "{}")
-        context.sendHtml(query.from, S.dictionaryAddPrompt)
+        context.editOrSendHtml(
+            query,
+            S.dictionaryAddPrompt,
+            replyMarkup = InlineKeyboardMarkup(
+                listOf(listOf(dataInlineButton(S.btnCancel, "dictionary_prompt")))
+            )
+        )
     }
 
     private suspend fun handleDictionaryFavorite(
@@ -608,10 +621,10 @@ class CallbackHandler(
             return
         }
         val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
-        val entry = dictionaryService.toggleFavorite(user.id, vocabId)
-        val status = if (entry.isFavorite) S.dictionaryFavorited else S.dictionaryUnfavorited
+        dictionaryService.toggleFavorite(user.id, vocabId)
         analyticsService.log("word_favorited", user.id, props = mapOf("itemId" to vocabId.toString()))
-        context.sendHtml(query.from, status)
+        // Return to dictionary list with updated state
+        handleDictionaryList(context, query, 0)
     }
 
     private suspend fun handleDictionaryTags(
@@ -648,14 +661,21 @@ class CallbackHandler(
         val tags = entry?.tags?.let { json.decodeFromString<List<String>>(it) } ?: emptyList()
         val nextTags = if (tags.contains(tag)) tags - tag else tags + tag
         dictionaryService.setTags(user.id, vocabId, nextTags)
-        context.sendHtml(query.from, S.dictionaryTagsUpdated(nextTags.joinToString(", ")))
+        // Return to dictionary list
+        handleDictionaryList(context, query, 0)
     }
 
     private suspend fun handleReviewStart(context: BehaviourContext, query: DataCallbackQuery) {
         val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
         val queue = reviewService.buildQueue(user.id, limit = 12, currentLessonId = user.currentLessonId)
         if (queue.isEmpty()) {
-            context.sendHtml(query.from, S.reviewEmpty)
+            context.editOrSendHtml(
+                query,
+                S.reviewEmpty,
+                replyMarkup = InlineKeyboardMarkup(
+                    listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
+                )
+            )
             return
         }
 
@@ -692,7 +712,13 @@ class CallbackHandler(
         val nextIndex = payload.index + 1
         if (nextIndex >= payload.vocabularyIds.size) {
             userStateService.clear(user.id)
-            context.sendHtml(query.from, S.reviewDone)
+            context.editOrSendHtml(
+                query,
+                S.reviewDone,
+                replyMarkup = InlineKeyboardMarkup(
+                    listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
+                )
+            )
             return
         }
         val nextPayload = payload.copy(index = nextIndex)
@@ -733,8 +759,8 @@ class CallbackHandler(
         val status = if (pref.isEnabled) S.reminderStatusOn(pref.daysOfWeek, pref.timeLocal)
         else S.reminderStatusOff
 
-        context.sendHtml(
-            query.from,
+        context.editOrSendHtml(
+            query,
             status,
             replyMarkup = InlineKeyboardMarkup(
                 listOf(
@@ -750,24 +776,48 @@ class CallbackHandler(
         val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
         val pref = reminderPreferenceService.setSchedule(user.id, "MON,TUE,WED,THU,FRI", "19:00")
         analyticsService.log("reminder_set", user.id, props = mapOf("schedule" to "${pref.daysOfWeek} ${pref.timeLocal}"))
-        context.sendHtml(query.from, S.reminderEnabled(pref.daysOfWeek, pref.timeLocal))
+        context.editOrSendHtml(
+            query,
+            S.reminderEnabled(pref.daysOfWeek, pref.timeLocal),
+            replyMarkup = InlineKeyboardMarkup(
+                listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
+            )
+        )
     }
 
     private suspend fun handleReminderDisable(context: BehaviourContext, query: DataCallbackQuery) {
         val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
         reminderPreferenceService.setEnabled(user.id, false)
-        context.sendHtml(query.from, S.reminderDisabled)
+        context.editOrSendHtml(
+            query,
+            S.reminderDisabled,
+            replyMarkup = InlineKeyboardMarkup(
+                listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
+            )
+        )
     }
 
     private suspend fun handleHelp(context: BehaviourContext, query: DataCallbackQuery) {
-        context.sendHtml(query.from, S.help)
+        context.editOrSendHtml(
+            query,
+            S.help,
+            replyMarkup = InlineKeyboardMarkup(
+                listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
+            )
+        )
     }
 
     private suspend fun handleContinue(context: BehaviourContext, query: DataCallbackQuery) {
         val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
         val state = userStateService.get(user.id)
         if (state == null) {
-            context.sendHtml(query.from, S.continueNothing)
+            context.editOrSendHtml(
+                query,
+                S.continueNothing,
+                replyMarkup = InlineKeyboardMarkup(
+                    listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
+                )
+            )
             return
         }
 
@@ -798,11 +848,14 @@ class CallbackHandler(
             return
         }
 
-        context.sendHtml(
-            query.from,
+        context.editOrSendHtml(
+            query,
             S.homeworkStart,
             replyMarkup = InlineKeyboardMarkup(
-                listOf(listOf(dataInlineButton(S.btnStartHomework, "start_homework:$lessonId")))
+                listOf(
+                    listOf(dataInlineButton(S.btnStartHomework, "start_homework:$lessonId")),
+                    listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
+                )
             )
         )
         val user = userService.findByTelegramId(query.from.id.chatId.long)
@@ -821,7 +874,13 @@ class CallbackHandler(
         }
 
         val homework = homeworkService.getHomeworkForLesson(lessonId) ?: run {
-            context.sendHtml(query.from, S.homeworkNotReady)
+            context.editOrSendHtml(
+                query,
+                S.homeworkNotReady,
+                replyMarkup = InlineKeyboardMarkup(
+                    listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
+                )
+            )
             return
         }
 
@@ -1035,7 +1094,13 @@ class CallbackHandler(
             streakDays = summary.currentStreak
         )
 
-        context.sendHtml(query.from, progressText)
+        context.editOrSendHtml(
+            query,
+            progressText,
+            replyMarkup = InlineKeyboardMarkup(
+                listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
+            )
+        )
         analyticsService.log("progress_opened", user.id)
     }
 
@@ -1078,8 +1143,8 @@ class CallbackHandler(
     }
 
     private suspend fun handleSettings(context: BehaviourContext, query: DataCallbackQuery) {
-        context.sendHtml(
-            query.from,
+        context.editOrSendHtml(
+            query,
             S.settingsTitle,
             replyMarkup = InlineKeyboardMarkup(
                 listOf(
@@ -1091,8 +1156,8 @@ class CallbackHandler(
     }
 
     private suspend fun handleResetProgress(context: BehaviourContext, query: DataCallbackQuery) {
-        context.sendHtml(
-            query.from,
+        context.editOrSendHtml(
+            query,
             S.resetProgressConfirm,
             replyMarkup = InlineKeyboardMarkup(
                 listOf(
@@ -1130,8 +1195,8 @@ class CallbackHandler(
     }
 
     private suspend fun handleSelectLevel(context: BehaviourContext, query: DataCallbackQuery) {
-        context.sendHtml(
-            query.from,
+        context.editOrSendHtml(
+            query,
             S.selectLevelTitle,
             replyMarkup = InlineKeyboardMarkup(
                 listOf(
@@ -1159,8 +1224,8 @@ class CallbackHandler(
             else -> S.levelLocked(level)
         }
 
-        context.sendHtml(
-            query.from,
+        context.editOrSendHtml(
+            query,
             message,
             replyMarkup = InlineKeyboardMarkup(
                 listOf(listOf(dataInlineButton(S.btnBack, "select_level")))
@@ -1169,8 +1234,8 @@ class CallbackHandler(
     }
 
     private suspend fun handleKnowledgeTest(context: BehaviourContext, query: DataCallbackQuery) {
-        context.sendHtml(
-            query.from,
+        context.editOrSendHtml(
+            query,
             S.knowledgeTestTitle,
             replyMarkup = InlineKeyboardMarkup(
                 listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
@@ -1212,8 +1277,9 @@ class CallbackHandler(
             )
         }
 
-        context.sendHtml(
-            query.from,
+        // Edit in place to replace the current menu
+        context.editOrSendHtml(
+            query,
             S.menuTitle,
             replyMarkup = InlineKeyboardMarkup(buttons)
         )
