@@ -8,6 +8,7 @@ import com.turki.bot.service.ProgressService
 import com.turki.bot.service.UserStateService
 import com.turki.bot.service.UserFlowState
 import com.turki.bot.util.sendHtml
+import com.turki.core.domain.Language
 import com.turki.core.domain.QuestionType
 import dev.inmo.tgbotapi.extensions.behaviour_builder.BehaviourContext
 import dev.inmo.tgbotapi.extensions.utils.extensions.raw.from
@@ -137,12 +138,17 @@ class HomeworkHandler(private val homeworkService: HomeworkService) {
             }
 
             val feedback = buildHomeworkFeedback(homework, answers, submission.score, submission.maxScore)
-            val keyboard = InlineKeyboardMarkup(
-                listOf(
-                    listOf(dataInlineButton(S.btnRepeatTopic, "lesson_start:${homework.lessonId}")),
-                    listOf(dataInlineButton(S.btnNextHomework, "next_homework:${homework.lessonId}"))
-                )
-            )
+
+            // Get next lesson to offer navigation
+            val nextLesson = lessonService.getNextLesson(homework.lessonId, Language.TURKISH)
+            val buttons = buildList {
+                add(listOf(dataInlineButton(S.btnRepeatTopic, "lesson_start:${homework.lessonId}")))
+                if (nextLesson != null) {
+                    add(listOf(dataInlineButton(S.btnNextLesson, "lesson_start:${nextLesson.id}")))
+                }
+                add(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
+            }
+            val keyboard = InlineKeyboardMarkup(buttons)
 
             analyticsService.log(
                 "hw_autocheck_done",

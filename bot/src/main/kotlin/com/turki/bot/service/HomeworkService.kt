@@ -144,18 +144,35 @@ class HomeworkService(
             return false
         }
 
-        val allowPrefix = question.questionText.contains("начните", ignoreCase = true) ||
-            question.questionText.contains("benim", ignoreCase = true) ||
-            normalizedCorrect == "benim adım"
-
-        return if (
-            allowPrefix &&
-            (question.questionType == QuestionType.TEXT_INPUT || question.questionType == QuestionType.TRANSLATION)
-        ) {
-            normalizedUser.startsWith(normalizedCorrect)
-        } else {
-            normalizedUser == normalizedCorrect
+        // Exact match first
+        if (normalizedUser == normalizedCorrect) {
+            return true
         }
+
+        // For text input/translation questions, allow flexible matching
+        if (question.questionType == QuestionType.TEXT_INPUT || question.questionType == QuestionType.TRANSLATION) {
+            // For "Меня зовут" questions: accept "Benim adım X" as well as "Adım X"
+            // Also accept any name if the pattern is correct
+            if (normalizedCorrect.startsWith("adım ") || 
+                question.questionText.contains("зовут", ignoreCase = true)) {
+                // Accept "benim adım X" for "adım X"
+                if (normalizedUser.startsWith("benim adım ")) {
+                    return true
+                }
+                // Accept "adım X" for any name (user might use their own name)
+                if (normalizedUser.startsWith("adım ")) {
+                    return true
+                }
+            }
+
+            // For questions asking user to start with something, allow prefix matching
+            val allowPrefix = question.questionText.contains("начните", ignoreCase = true)
+            if (allowPrefix && normalizedUser.startsWith(normalizedCorrect)) {
+                return true
+            }
+        }
+
+        return false
     }
 
     private fun normalizeAnswer(text: String): String {

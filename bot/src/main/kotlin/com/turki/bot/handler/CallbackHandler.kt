@@ -1167,13 +1167,17 @@ class CallbackHandler(
         }
 
         val feedback = buildHomeworkFeedback(homework, answers, submission.score, submission.maxScore)
-        val keyboard = InlineKeyboardMarkup(
-            listOf(
-                listOf(dataInlineButton(S.btnRepeatTopic, "lesson_start:${homework.lessonId}")),
-                listOf(dataInlineButton(S.btnNextHomework, "next_homework:${homework.lessonId}")),
-                listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
-            )
-        )
+
+        // Get next lesson to offer navigation
+        val nextLesson = lessonService.getNextLesson(homework.lessonId, Language.TURKISH)
+        val buttons = buildList {
+            add(listOf(dataInlineButton(S.btnRepeatTopic, "lesson_start:${homework.lessonId}")))
+            if (nextLesson != null) {
+                add(listOf(dataInlineButton(S.btnNextLesson, "lesson_start:${nextLesson.id}")))
+            }
+            add(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
+        }
+        val keyboard = InlineKeyboardMarkup(buttons)
 
         // Edit in place for smooth homework flow
         context.editOrSendHtml(query, "$resultText\n\n$feedback", replyMarkup = keyboard)
