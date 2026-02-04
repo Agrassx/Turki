@@ -69,8 +69,8 @@ class SupportService {
      * Returns null if the message is not a valid support message reply.
      */
     fun extractUserIdFromReply(replyText: String): Long? {
-        // Look for 🆔 <code>123456789</code> pattern
-        val regex = """🆔\s*<code>(\d+)</code>""".toRegex()
+        // Look for 🆔 followed by a number (HTML tags are rendered by Telegram)
+        val regex = """🆔\s*(\d+)""".toRegex()
         val match = regex.find(replyText)
         return match?.groupValues?.get(1)?.toLongOrNull()
     }

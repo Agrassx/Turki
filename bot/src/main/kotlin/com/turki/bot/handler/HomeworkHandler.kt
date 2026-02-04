@@ -63,12 +63,7 @@ class HomeworkHandler(private val homeworkService: HomeworkService) {
         answers[questionId] = answer
         HomeworkStateManager.setAnswers(telegramId, answers)
 
-        // Delete user's answer message for cleaner chat
-        try {
-            context.delete(message)
-        } catch (e: Exception) {
-            logger.debug("Could not delete user message: ${e.message}")
-        }
+        deleteUserAndQuestionMessages(context, message, telegramId)
 
         val user = userService.findByTelegramId(telegramId) ?: run {
             logger.warn("handleTextAnswer: user not found for telegramId=$telegramId")
@@ -80,97 +75,154 @@ class HomeworkHandler(private val homeworkService: HomeworkService) {
         }
 
         val currentIndex = homework.questions.indexOfFirst { it.id == questionId }
-
         val isCorrect = currentQuestionIsCorrect(homework, questionId, answer)
+
         if (!isCorrect) {
-            HomeworkStateManager.clearCurrentQuestion(telegramId)
-            userStateService.clear(user.id)
-            val question = homework.questions.firstOrNull { it.id == questionId }
-            val vocabId = question?.let { resolveHomeworkVocabularyId(homework.lessonId, it) }
-            val addButton = if (vocabId != null) {
-                listOf(dataInlineButton(S.btnAddToDictionary, "hw_add_dict:$homeworkId:$questionId"))
-            } else {
-                listOf(dataInlineButton(S.btnAddCustomWord, "dict_add_custom"))
-            }
-            val buttons = InlineKeyboardMarkup(
-                listOf(
-                    addButton,
-                    listOf(dataInlineButton(S.btnNext, "hw_next:$homeworkId:$questionId"))
-                )
-            )
-            val text = buildString {
-                appendLine(S.exerciseIncorrect)
-                if (question != null) {
-                    appendLine(S.homeworkCorrectAnswer(question.correctAnswer))
-                }
-            }
-            context.sendHtml(message.chat, text, replyMarkup = buttons)
+            handleIncorrectAnswer(context, message, user, homework, homeworkId, questionId, telegramId)
             return
         }
 
         if (currentIndex < homework.questions.size - 1) {
-            val nextQuestion = homework.questions[currentIndex + 1]
-            val questionText = "${S.questionTitle(currentIndex + 2)}\n\n${nextQuestion.questionText}"
-
-            when (nextQuestion.questionType) {
-                QuestionType.MULTIPLE_CHOICE -> {
-                    // Only send index in callback to avoid 64-byte limit
-                    val buttons = nextQuestion.options.mapIndexed { optIndex, option ->
-                        listOf(dataInlineButton(option, "answer:$homeworkId:${nextQuestion.id}:$optIndex"))
-                    }
-                    context.sendHtml(
-                        message.chat,
-                        questionText,
-                        replyMarkup = InlineKeyboardMarkup(buttons)
-                    )
-                }
-                else -> {
-                    context.sendHtml(message.chat, "$questionText\n\n${S.writeYourAnswer}")
-                    HomeworkStateManager.setCurrentQuestion(telegramId, homeworkId, nextQuestion.id)
-                    userStateService.set(user.id, UserFlowState.HOMEWORK_TEXT.name, "{}")
-                }
-            }
+            sendNextQuestion(context, message, user, homework, homeworkId, currentIndex, telegramId)
         } else {
-            val submission = homeworkService.submitHomework(user.id, homeworkId, answers)
-            HomeworkStateManager.clearState(telegramId)
-            userStateService.clear(user.id)
-            progressService.recordHomework(user.id)
-            if (submission.score == submission.maxScore) {
-                progressService.markLessonCompleted(user.id, homework.lessonId)
-            }
-
-            val resultText = if (submission.score == submission.maxScore) {
-                S.homeworkComplete(submission.score, submission.maxScore)
-            } else {
-                S.homeworkResult(submission.score, submission.maxScore)
-            }
-
-            val feedback = buildHomeworkFeedback(homework, answers, submission.score, submission.maxScore)
-
-            // Get next lesson to offer navigation
-            val nextLesson = lessonService.getNextLesson(homework.lessonId, Language.TURKISH)
-            val buttons = buildList {
-                add(listOf(dataInlineButton(S.btnRepeatTopic, "lesson_start:${homework.lessonId}")))
-                if (nextLesson != null) {
-                    add(listOf(dataInlineButton(S.btnNextLesson, "lesson_start:${nextLesson.id}")))
-                }
-                add(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
-            }
-            val keyboard = InlineKeyboardMarkup(buttons)
-
-            analyticsService.log(
-                "hw_autocheck_done",
-                user.id,
-                props = mapOf("score" to submission.score.toString())
-            )
-            analyticsService.log(
-                "hw_submitted",
-                user.id,
-                props = mapOf("score" to submission.score.toString())
-            )
-
-            context.sendHtml(message.chat, "$resultText\n\n$feedback", replyMarkup = keyboard)
+            submitAndShowResults(context, message, user, homework, homeworkId, answers)
         }
+    }
+
+    private suspend fun deleteUserAndQuestionMessages(
+        context: BehaviourContext,
+        message: CommonMessage<TextContent>,
+        telegramId: Long
+    ) {
+        try {
+            context.delete(message)
+        } catch (e: Exception) {
+            logger.debug("Could not delete user message: ${e.message}")
+        }
+
+        val questionMessageId = HomeworkStateManager.getQuestionMessageId(telegramId)
+        if (questionMessageId != null) {
+            try {
+                context.bot.execute(
+                    dev.inmo.tgbotapi.requests.DeleteMessage(
+                        message.chat.id,
+                        dev.inmo.tgbotapi.types.MessageId(questionMessageId)
+                    )
+                )
+            } catch (e: Exception) {
+                logger.debug("Could not delete question message: ${e.message}")
+            }
+        }
+    }
+
+    private suspend fun handleIncorrectAnswer(
+        context: BehaviourContext,
+        message: CommonMessage<TextContent>,
+        user: com.turki.core.domain.User,
+        homework: com.turki.core.domain.Homework,
+        homeworkId: Int,
+        questionId: Int,
+        telegramId: Long
+    ) {
+        HomeworkStateManager.clearCurrentQuestion(telegramId)
+        userStateService.clear(user.id)
+        val question = homework.questions.firstOrNull { it.id == questionId }
+        val vocabId = question?.let { resolveHomeworkVocabularyId(homework.lessonId, it) }
+        val addButton = if (vocabId != null) {
+            listOf(dataInlineButton(S.btnAddToDictionary, "hw_add_dict:$homeworkId:$questionId"))
+        } else {
+            listOf(dataInlineButton(S.btnAddCustomWord, "dict_add_custom"))
+        }
+        val buttons = InlineKeyboardMarkup(
+            listOf(
+                addButton,
+                listOf(dataInlineButton(S.btnNext, "hw_next:$homeworkId:$questionId"))
+            )
+        )
+        val text = buildString {
+            appendLine(S.exerciseIncorrect)
+            if (question != null) {
+                appendLine(S.homeworkCorrectAnswer(question.correctAnswer))
+            }
+        }
+        context.sendHtml(message.chat, text, replyMarkup = buttons)
+    }
+
+    private suspend fun sendNextQuestion(
+        context: BehaviourContext,
+        message: CommonMessage<TextContent>,
+        user: com.turki.core.domain.User,
+        homework: com.turki.core.domain.Homework,
+        homeworkId: Int,
+        currentIndex: Int,
+        telegramId: Long
+    ) {
+        val nextQuestion = homework.questions[currentIndex + 1]
+        val processedQuestion = if (nextQuestion.questionText.contains("...")) {
+            nextQuestion.questionText.replace("...", user.firstName)
+        } else {
+            nextQuestion.questionText
+        }
+        val questionText = "${S.questionTitle(currentIndex + 2)}\n\n$processedQuestion"
+
+        when (nextQuestion.questionType) {
+            QuestionType.MULTIPLE_CHOICE -> {
+                val buttons = nextQuestion.options.mapIndexed { optIndex, option ->
+                    listOf(dataInlineButton(option, "answer:$homeworkId:${nextQuestion.id}:$optIndex"))
+                }
+                context.sendHtml(
+                    message.chat,
+                    questionText,
+                    replyMarkup = InlineKeyboardMarkup(buttons)
+                )
+            }
+            else -> {
+                val sentMessage = context.sendHtml(message.chat, "$questionText\n\n${S.writeYourAnswer}")
+                val msgId = sentMessage.messageId.long
+                HomeworkStateManager.setCurrentQuestion(telegramId, homeworkId, nextQuestion.id, msgId)
+                userStateService.set(user.id, UserFlowState.HOMEWORK_TEXT.name, "{}")
+            }
+        }
+    }
+
+    private suspend fun submitAndShowResults(
+        context: BehaviourContext,
+        message: CommonMessage<TextContent>,
+        user: com.turki.core.domain.User,
+        homework: com.turki.core.domain.Homework,
+        homeworkId: Int,
+        answers: MutableMap<Int, String>
+    ) {
+        val telegramId = user.telegramId
+        val submission = homeworkService.submitHomework(user.id, homeworkId, answers)
+        HomeworkStateManager.clearState(telegramId)
+        userStateService.clear(user.id)
+        progressService.recordHomework(user.id)
+        if (submission.score == submission.maxScore) {
+            progressService.markLessonCompleted(user.id, homework.lessonId)
+        }
+
+        val resultText = if (submission.score == submission.maxScore) {
+            S.homeworkComplete(submission.score, submission.maxScore)
+        } else {
+            S.homeworkResult(submission.score, submission.maxScore)
+        }
+
+        val feedback = buildHomeworkFeedback(homework, answers, submission.score, submission.maxScore)
+        val nextLesson = lessonService.getNextLesson(homework.lessonId, Language.TURKISH)
+        val buttons = buildList {
+            add(listOf(dataInlineButton(S.btnRepeatTopic, "lesson_start:${homework.lessonId}")))
+            if (nextLesson != null) {
+                add(listOf(dataInlineButton(S.btnNextLesson, "lesson_start:${nextLesson.id}")))
+            }
+            add(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
+        }
+        val keyboard = InlineKeyboardMarkup(buttons)
+
+        analyticsService.log("hw_autocheck_done", user.id, props = mapOf("score" to submission.score.toString()))
+        analyticsService.log("hw_submitted", user.id, props = mapOf("score" to submission.score.toString()))
+
+        context.sendHtml(message.chat, "$resultText\n\n$feedback", replyMarkup = keyboard)
     }
 
     private fun currentQuestionIsCorrect(

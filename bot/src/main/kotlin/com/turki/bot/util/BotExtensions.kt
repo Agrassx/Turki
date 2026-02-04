@@ -217,14 +217,15 @@ private val messageLogger = LoggerFactory.getLogger("BotExtensions")
 
 /**
  * Sends a new HTML message to the chat.
+ * Returns the sent message.
  */
 suspend fun BehaviourContext.sendHtml(
     chat: Any,
     text: String,
     replyMarkup: KeyboardMarkup? = null
-) {
+): dev.inmo.tgbotapi.types.message.abstracts.ContentMessage<dev.inmo.tgbotapi.types.message.content.TextContent> {
     val markup = replyMarkup ?: mainCommandKeyboard()
-    sendMessage(
+    return sendMessage(
         chatId = chat.toChatId(),
         text = text,
         parseMode = HTMLParseMode,
@@ -263,12 +264,13 @@ suspend fun BehaviourContext.editOrSendHtml(
 /**
  * Deletes the callback message and sends a new one.
  * Use this when you want to replace the menu with a fresh message.
+ * Returns the sent message.
  */
 suspend fun BehaviourContext.replaceWithHtml(
     query: DataCallbackQuery,
     text: String,
     replyMarkup: KeyboardMarkup? = null
-) {
+): dev.inmo.tgbotapi.types.message.abstracts.ContentMessage<dev.inmo.tgbotapi.types.message.content.TextContent> {
     val callbackMessage = (query as? MessageDataCallbackQuery)?.message
     if (callbackMessage != null) {
         try {
@@ -277,7 +279,7 @@ suspend fun BehaviourContext.replaceWithHtml(
             messageLogger.debug("Could not delete message: ${e.message}")
         }
     }
-    sendHtml(query.from, text, replyMarkup)
+    return sendHtml(query.from, text, replyMarkup)
 }
 
 /**

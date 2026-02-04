@@ -1265,14 +1265,28 @@ class CallbackHandler(
                 sendExercise(context, query, payload)
             }
             UserFlowState.REVIEW.name -> {
-                val payload = json.decodeFromString<ReviewFlowPayload>(state.payload)
-                sendReviewCard(context, query, payload)
+                try {
+                    val payload = json.decodeFromString<ReviewSessionPayload>(state.payload)
+                    sendReviewSessionQuestion(context, query, payload)
+                } catch (e: Exception) {
+                    logger.debug("handleContinue: trying legacy format: ${e.message}")
+                    val payload = json.decodeFromString<ReviewFlowPayload>(state.payload)
+                    sendReviewCard(context, query, payload)
+                }
             }
             UserFlowState.DICT_SEARCH.name -> {
                 context.sendHtml(query.from, S.dictionaryPrompt)
             }
             UserFlowState.HOMEWORK_TEXT.name -> {
                 context.sendHtml(query.from, S.homeworkContinue)
+            }
+            UserFlowState.SUPPORT_MESSAGE.name -> {
+                context.sendHtml(query.from, S.supportPrompt)
+            }
+            else -> {
+                // Unknown state - clear it and show menu
+                userStateService.clear(user.id)
+                handleBackToMenu(context, query)
             }
         }
     }
@@ -1344,7 +1358,7 @@ class CallbackHandler(
             return
         }
 
-        sendQuestion(context, query, homework.questions.first(), 0, homework.id)
+        sendQuestion(context, query, homework.questions.first(), 0, homework.id, user.firstName)
         analyticsService.log(EventNames.HOMEWORK_STARTED, user.id, props = mapOf("lessonId" to lessonId.toString()))
     }
 
@@ -1353,9 +1367,16 @@ class CallbackHandler(
         query: DataCallbackQuery,
         question: com.turki.core.domain.HomeworkQuestion,
         index: Int,
-        homeworkId: Int
+        homeworkId: Int,
+        firstName: String? = null
     ) {
-        val questionText = "${S.questionTitle(index + 1)}\n\n${question.questionText}"
+        // Replace "..." with user's name in name-related questions
+        val processedQuestion = if (firstName != null && question.questionText.contains("...")) {
+            question.questionText.replace("...", firstName)
+        } else {
+            question.questionText
+        }
+        val questionText = "${S.questionTitle(index + 1)}\n\n$processedQuestion"
 
         when (question.questionType) {
             QuestionType.MULTIPLE_CHOICE -> {
@@ -1372,8 +1393,9 @@ class CallbackHandler(
             }
             QuestionType.TEXT_INPUT, QuestionType.TRANSLATION -> {
                 // For text input, we need a new message as user will type answer
-                context.replaceWithHtml(query, "$questionText\n\n${S.writeYourAnswer}")
-                HomeworkStateManager.setCurrentQuestion(query.from.id.chatId.long, homeworkId, question.id)
+                val sentMessage = context.replaceWithHtml(query, "$questionText\n\n${S.writeYourAnswer}")
+                val messageId = sentMessage.messageId.long
+                HomeworkStateManager.setCurrentQuestion(query.from.id.chatId.long, homeworkId, question.id, messageId)
                 val user = userService.findByTelegramId(query.from.id.chatId.long)
                 if (user != null) {
                     userStateService.set(user.id, UserFlowState.HOMEWORK_TEXT.name, "{}")
@@ -1450,7 +1472,7 @@ class CallbackHandler(
         }
 
         if (currentIndex < homework.questions.size - 1) {
-            sendQuestion(context, query, homework.questions[currentIndex + 1], currentIndex + 1, homeworkId)
+            sendQuestion(context, query, homework.questions[currentIndex + 1], currentIndex + 1, homeworkId, user.firstName)
         } else {
             submitHomeworkResult(context, query, user, homework, currentAnswers)
         }
@@ -1480,7 +1502,7 @@ class CallbackHandler(
         }
         val currentIndex = homework.questions.indexOfFirst { it.id == questionId }
         if (currentIndex < homework.questions.size - 1) {
-            sendQuestion(context, query, homework.questions[currentIndex + 1], currentIndex + 1, homeworkId)
+            sendQuestion(context, query, homework.questions[currentIndex + 1], currentIndex + 1, homeworkId, user.firstName)
         } else {
             val answers = HomeworkStateManager.getAnswers(user.telegramId)
             submitHomeworkResult(context, query, user, homework, answers)
@@ -1828,12 +1850,18 @@ class CallbackHandler(
 object HomeworkStateManager {
     private val currentQuestions = mutableMapOf<Long, Pair<Int, Int>>()
     private val userAnswers = mutableMapOf<Long, MutableMap<Int, String>>()
+    private val questionMessageIds = mutableMapOf<Long, Long>()
 
-    fun setCurrentQuestion(telegramId: Long, homeworkId: Int, questionId: Int) {
+    fun setCurrentQuestion(telegramId: Long, homeworkId: Int, questionId: Int, messageId: Long? = null) {
         currentQuestions[telegramId] = homeworkId to questionId
+        if (messageId != null) {
+            questionMessageIds[telegramId] = messageId
+        }
     }
 
     fun getCurrentQuestion(telegramId: Long): Pair<Int, Int>? = currentQuestions[telegramId]
+
+    fun getQuestionMessageId(telegramId: Long): Long? = questionMessageIds[telegramId]
 
     fun getAnswers(telegramId: Long): MutableMap<Int, String> =
         userAnswers.getOrPut(telegramId) { mutableMapOf() }
@@ -1845,9 +1873,11 @@ object HomeworkStateManager {
     fun clearState(telegramId: Long) {
         currentQuestions.remove(telegramId)
         userAnswers.remove(telegramId)
+        questionMessageIds.remove(telegramId)
     }
 
     fun clearCurrentQuestion(telegramId: Long) {
         currentQuestions.remove(telegramId)
+        questionMessageIds.remove(telegramId)
     }
 }
