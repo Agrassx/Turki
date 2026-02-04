@@ -16,6 +16,9 @@ import dev.inmo.tgbotapi.types.buttons.inline.dataInlineButton
 import dev.inmo.tgbotapi.types.message.abstracts.CommonMessage
 import dev.inmo.tgbotapi.types.message.content.TextContent
 import org.koin.java.KoinJavaComponent.inject
+import org.slf4j.LoggerFactory
+
+private val logger = LoggerFactory.getLogger("HomeworkHandler")
 
 /**
  * Handler for processing text answers to homework questions.
@@ -41,10 +44,16 @@ class HomeworkHandler(private val homeworkService: HomeworkService) {
     private val analyticsService: AnalyticsService by inject(AnalyticsService::class.java)
 
     suspend fun handleTextAnswer(context: BehaviourContext, message: CommonMessage<TextContent>) {
-        val from = message.from ?: return
+        val from = message.from ?: run {
+            logger.warn("handleTextAnswer: message.from is null")
+            return
+        }
         val telegramId = from.id.chatId.long
 
-        val currentState = HomeworkStateManager.getCurrentQuestion(telegramId) ?: return
+        val currentState = HomeworkStateManager.getCurrentQuestion(telegramId) ?: run {
+            logger.debug("handleTextAnswer: no current question state for telegramId=$telegramId")
+            return
+        }
         val (homeworkId, questionId) = currentState
 
         val answer = message.content.text.trim()
@@ -52,8 +61,14 @@ class HomeworkHandler(private val homeworkService: HomeworkService) {
         answers[questionId] = answer
         HomeworkStateManager.setAnswers(telegramId, answers)
 
-        val user = userService.findByTelegramId(telegramId) ?: return
-        val homework = homeworkService.getHomeworkForLesson(user.currentLessonId) ?: return
+        val user = userService.findByTelegramId(telegramId) ?: run {
+            logger.warn("handleTextAnswer: user not found for telegramId=$telegramId")
+            return
+        }
+        val homework = homeworkService.getHomeworkById(homeworkId) ?: run {
+            logger.warn("handleTextAnswer: homework not found for homeworkId=$homeworkId")
+            return
+        }
 
         val currentIndex = homework.questions.indexOfFirst { it.id == questionId }
 
@@ -90,8 +105,9 @@ class HomeworkHandler(private val homeworkService: HomeworkService) {
 
             when (nextQuestion.questionType) {
                 QuestionType.MULTIPLE_CHOICE -> {
+                    // Only send index in callback to avoid 64-byte limit
                     val buttons = nextQuestion.options.mapIndexed { optIndex, option ->
-                        listOf(dataInlineButton(option, "answer:$homeworkId:${nextQuestion.id}:$optIndex:$option"))
+                        listOf(dataInlineButton(option, "answer:$homeworkId:${nextQuestion.id}:$optIndex"))
                     }
                     context.sendHtml(
                         message.chat,

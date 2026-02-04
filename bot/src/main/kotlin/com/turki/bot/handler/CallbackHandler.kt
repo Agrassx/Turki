@@ -29,6 +29,9 @@ import dev.inmo.tgbotapi.types.buttons.inline.dataInlineButton
 import dev.inmo.tgbotapi.types.queries.callback.DataCallbackQuery
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
+import org.slf4j.LoggerFactory
+
+private val logger = LoggerFactory.getLogger("CallbackHandler")
 
 /**
  * Handler for Telegram bot inline callback queries.
@@ -118,6 +121,7 @@ class CallbackHandler(
             "reminder_disable" -> handleReminderDisable(context, query)
             "help" -> handleHelp(context, query)
             "next_homework" -> handleNextHomework(context, query, parts.getOrNull(1)?.toIntOrNull())
+            else -> logger.warn("Unknown callback action: '$action', data: '$data'")
         }
     }
 
@@ -127,10 +131,12 @@ class CallbackHandler(
         lessonId: Int?
     ) {
         if (lessonId == null) {
+            logger.warn("handleLessonCallback: lessonId is null")
             return
         }
 
         val lesson = lessonService.getLessonById(lessonId) ?: run {
+            logger.warn("handleLessonCallback: lesson not found for id=$lessonId")
             context.sendHtml(query.from, S.lessonNotFound)
             return
         }
@@ -217,10 +223,13 @@ class CallbackHandler(
         query: DataCallbackQuery,
         lessonId: Int?
     ) {
+        val telegramId = query.from.id.chatId.long
         if (lessonId == null) {
+            logger.warn("handleLessonStart: lessonId is null")
             return
         }
         val lesson = lessonService.getLessonById(lessonId) ?: run {
+            logger.warn("handleLessonStart: lesson not found for id=$lessonId")
             context.sendHtml(query.from, S.lessonNotFound)
             return
         }
@@ -235,8 +244,9 @@ class CallbackHandler(
             appendLine(lesson.content.markdownToHtml())
         }
 
-        context.sendHtml(
-            query.from,
+        // Replace menu message with lesson content
+        context.replaceWithHtml(
+            query,
             introText,
             replyMarkup = InlineKeyboardMarkup(
                 listOf(
@@ -246,7 +256,10 @@ class CallbackHandler(
                 )
             )
         )
-        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val user = userService.findByTelegramId(telegramId) ?: run {
+            logger.warn("handleLessonStart: user not found for telegramId=$telegramId")
+            return
+        }
         progressService.markLessonStarted(user.id, lesson.id)
         analyticsService.log("lesson_opened", user.id, props = mapOf("lessonId" to lesson.id.toString()))
     }
@@ -398,7 +411,13 @@ class CallbackHandler(
         }
         val exercises = exerciseService.buildLessonExercises(lesson.id)
         if (exercises.isEmpty()) {
-            context.sendHtml(query.from, S.exerciseNotReady)
+            context.editOrSendHtml(
+                query,
+                S.exerciseNotReady,
+                replyMarkup = InlineKeyboardMarkup(
+                    listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
+                )
+            )
             return
         }
 
@@ -420,22 +439,46 @@ class CallbackHandler(
         query: DataCallbackQuery,
         parts: List<String>
     ) {
+        val telegramId = query.from.id.chatId.long
         if (parts.size < 4) {
+            logger.warn("handleExerciseAnswer: invalid parts count ${parts.size}")
             return
         }
-        val vocabId = parts[2].toIntOrNull() ?: return
-        val selectedIndex = parts[3].toIntOrNull() ?: return
+        val vocabId = parts[2].toIntOrNull() ?: run {
+            logger.warn("handleExerciseAnswer: invalid vocabId '${parts[2]}'")
+            return
+        }
+        val selectedIndex = parts[3].toIntOrNull() ?: run {
+            logger.warn("handleExerciseAnswer: invalid selectedIndex '${parts[3]}'")
+            return
+        }
 
-        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
-        val state = userStateService.get(user.id) ?: return
+        val user = userService.findByTelegramId(telegramId) ?: run {
+            logger.warn("handleExerciseAnswer: user not found for telegramId=$telegramId")
+            return
+        }
+        val state = userStateService.get(user.id) ?: run {
+            logger.warn("handleExerciseAnswer: no state for user=${user.id}")
+            return
+        }
         if (state.state != UserFlowState.EXERCISE.name) {
+            logger.warn("handleExerciseAnswer: wrong state '${state.state}', expected EXERCISE")
             return
         }
 
         val payload = json.decodeFromString<ExerciseFlowPayload>(state.payload)
-        val options = payload.optionsByVocabId[vocabId] ?: return
-        val selected = options.getOrNull(selectedIndex) ?: return
-        val correct = payload.correctByVocabId[vocabId] ?: return
+        val options = payload.optionsByVocabId[vocabId] ?: run {
+            logger.warn("handleExerciseAnswer: no options for vocabId=$vocabId")
+            return
+        }
+        val selected = options.getOrNull(selectedIndex) ?: run {
+            logger.warn("handleExerciseAnswer: invalid selectedIndex=$selectedIndex, options count=${options.size}")
+            return
+        }
+        val correct = payload.correctByVocabId[vocabId] ?: run {
+            logger.warn("handleExerciseAnswer: no correct answer for vocabId=$vocabId")
+            return
+        }
         val isCorrect = selected == correct
 
         val verdict = if (isCorrect) S.exerciseCorrect else S.exerciseIncorrect
@@ -456,8 +499,9 @@ class CallbackHandler(
             )
         }
 
-        context.sendHtml(
-            query.from,
+        // Edit in place for smooth flow
+        context.editOrSendHtml(
+            query,
             buildString {
                 appendLine(verdict)
                 if (explanation.isNotBlank()) {
@@ -492,8 +536,8 @@ class CallbackHandler(
         if (nextIndex >= payload.vocabularyIds.size) {
             userStateService.clear(user.id)
             progressService.recordPractice(user.id)
-            context.sendHtml(
-                query.from,
+            context.editOrSendHtml(
+                query,
                 S.exerciseComplete,
                 replyMarkup = InlineKeyboardMarkup(
                     listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
@@ -526,8 +570,9 @@ class CallbackHandler(
             props = mapOf("type" to "vocab_mcq")
         )
 
-        context.sendHtml(
-            query.from,
+        // Edit in place for smooth exercise flow
+        context.editOrSendHtml(
+            query,
             S.exercisePrompt(vocab.word),
             replyMarkup = InlineKeyboardMarkup(buttons)
         )
@@ -666,7 +711,11 @@ class CallbackHandler(
     }
 
     private suspend fun handleReviewStart(context: BehaviourContext, query: DataCallbackQuery) {
-        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val telegramId = query.from.id.chatId.long
+        val user = userService.findByTelegramId(telegramId) ?: run {
+            logger.warn("handleReviewStart: user not found for telegramId=$telegramId")
+            return
+        }
         val queue = reviewService.buildQueue(user.id, limit = 12, currentLessonId = user.currentLessonId)
         if (queue.isEmpty()) {
             context.editOrSendHtml(
@@ -693,19 +742,31 @@ class CallbackHandler(
         query: DataCallbackQuery,
         parts: List<String>
     ) {
+        val telegramId = query.from.id.chatId.long
         if (parts.size < 3) {
+            logger.warn("handleReviewAnswer: invalid parts count ${parts.size}")
             return
         }
-        val vocabId = parts[1].toIntOrNull() ?: return
+        val vocabId = parts[1].toIntOrNull() ?: run {
+            logger.warn("handleReviewAnswer: invalid vocabId '${parts[1]}'")
+            return
+        }
         val isCorrect = parts[2] == "1"
 
-        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val user = userService.findByTelegramId(telegramId) ?: run {
+            logger.warn("handleReviewAnswer: user not found for telegramId=$telegramId")
+            return
+        }
         reviewService.updateCard(user.id, vocabId, isCorrect)
         progressService.recordReview(user.id)
         analyticsService.log("review_completed", user.id, props = mapOf("isCorrect" to isCorrect.toString()))
 
-        val state = userStateService.get(user.id) ?: return
+        val state = userStateService.get(user.id) ?: run {
+            logger.warn("handleReviewAnswer: no state for user=${user.id}")
+            return
+        }
         if (state.state != UserFlowState.REVIEW.name) {
+            logger.warn("handleReviewAnswer: wrong state '${state.state}', expected REVIEW")
             return
         }
         val payload = json.decodeFromString<ReviewFlowPayload>(state.payload)
@@ -739,8 +800,9 @@ class CallbackHandler(
             item.example?.let { appendLine(S.dictionaryExample(it)) }
         }
 
-        context.sendHtml(
-            query.from,
+        // Edit in place for smooth review flow
+        context.editOrSendHtml(
+            query,
             card,
             replyMarkup = InlineKeyboardMarkup(
                 listOf(
@@ -869,11 +931,14 @@ class CallbackHandler(
         query: DataCallbackQuery,
         lessonId: Int?
     ) {
+        val telegramId = query.from.id.chatId.long
         if (lessonId == null) {
+            logger.warn("handleStartHomework: lessonId is null")
             return
         }
 
         val homework = homeworkService.getHomeworkForLesson(lessonId) ?: run {
+            logger.info("handleStartHomework: no homework for lessonId=$lessonId")
             context.editOrSendHtml(
                 query,
                 S.homeworkNotReady,
@@ -884,14 +949,20 @@ class CallbackHandler(
             return
         }
 
-        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
+        val user = userService.findByTelegramId(telegramId) ?: run {
+            logger.warn("handleStartHomework: user not found for telegramId=$telegramId")
+            return
+        }
 
         if (homeworkService.hasCompletedHomework(user.id, homework.id)) {
-            context.sendHtml(
-                query.from,
+            context.editOrSendHtml(
+                query,
                 S.homeworkAlreadyCompleted,
                 replyMarkup = InlineKeyboardMarkup(
-                    listOf(listOf(dataInlineButton(S.btnContinue, "lesson_start:${user.currentLessonId}")))
+                    listOf(
+                        listOf(dataInlineButton(S.btnContinue, "lesson_start:${user.currentLessonId}")),
+                        listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
+                    )
                 )
             )
             return
@@ -916,14 +987,16 @@ class CallbackHandler(
                 val buttons = question.options.mapIndexed { optIndex, option ->
                     listOf(dataInlineButton(option, "answer:$homeworkId:${question.id}:$optIndex"))
                 }
-                context.sendHtml(
-                    query.from,
+                // Edit in place for smooth homework flow
+                context.editOrSendHtml(
+                    query,
                     questionText,
                     replyMarkup = InlineKeyboardMarkup(buttons)
                 )
             }
             QuestionType.TEXT_INPUT, QuestionType.TRANSLATION -> {
-                context.sendHtml(query.from, "$questionText\n\n${S.writeYourAnswer}")
+                // For text input, we need a new message as user will type answer
+                context.replaceWithHtml(query, "$questionText\n\n${S.writeYourAnswer}")
                 HomeworkStateManager.setCurrentQuestion(query.from.id.chatId.long, homeworkId, question.id)
                 val user = userService.findByTelegramId(query.from.id.chatId.long)
                 if (user != null) {
@@ -939,20 +1012,43 @@ class CallbackHandler(
         parts: List<String>
     ) {
         // Format: answer:homeworkId:questionId:optionIndex
+        val telegramId = query.from.id.chatId.long
         if (parts.size < 4) {
+            logger.warn("handleAnswer: invalid parts count ${parts.size}, expected 4. Data: $parts")
             return
         }
 
-        val homeworkId = parts[1].toIntOrNull() ?: return
-        val questionId = parts[2].toIntOrNull() ?: return
-        val optionIndex = parts[3].toIntOrNull() ?: return
+        val homeworkId = parts[1].toIntOrNull() ?: run {
+            logger.warn("handleAnswer: invalid homeworkId '${parts[1]}'")
+            return
+        }
+        val questionId = parts[2].toIntOrNull() ?: run {
+            logger.warn("handleAnswer: invalid questionId '${parts[2]}'")
+            return
+        }
+        val optionIndex = parts[3].toIntOrNull() ?: run {
+            logger.warn("handleAnswer: invalid optionIndex '${parts[3]}'")
+            return
+        }
 
-        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
-        val homework = homeworkService.getHomeworkForLesson(user.currentLessonId) ?: return
-        val question = homework.questions.firstOrNull { it.id == questionId } ?: return
+        val user = userService.findByTelegramId(telegramId) ?: run {
+            logger.warn("handleAnswer: user not found for telegramId=$telegramId")
+            return
+        }
+        val homework = homeworkService.getHomeworkById(homeworkId) ?: run {
+            logger.warn("handleAnswer: homework not found for homeworkId=$homeworkId, user=${user.id}")
+            return
+        }
+        val question = homework.questions.firstOrNull { it.id == questionId } ?: run {
+            logger.warn("handleAnswer: question not found for questionId=$questionId in homework=$homeworkId")
+            return
+        }
 
         // Get the answer text from the question options by index
-        val answer = question.options.getOrNull(optionIndex) ?: return
+        val answer = question.options.getOrNull(optionIndex) ?: run {
+            logger.warn("handleAnswer: invalid optionIndex=$optionIndex, options count=${question.options.size}")
+            return
+        }
 
         val currentAnswers = HomeworkStateManager.getAnswers(user.telegramId)
         currentAnswers[questionId] = answer
@@ -968,8 +1064,9 @@ class CallbackHandler(
                 appendLine(S.exerciseIncorrect)
                 appendLine(S.homeworkCorrectAnswer(question.correctAnswer))
             }
-            context.sendHtml(
-                query.from,
+            // Edit in place for smooth homework flow
+            context.editOrSendHtml(
+                query,
                 text,
                 replyMarkup = InlineKeyboardMarkup(buttons)
             )
@@ -984,11 +1081,27 @@ class CallbackHandler(
     }
 
     private suspend fun handleHomeworkNext(context: BehaviourContext, query: DataCallbackQuery, parts: List<String>) {
-        if (parts.size < 3) return
-        val homeworkId = parts[1].toIntOrNull() ?: return
-        val questionId = parts[2].toIntOrNull() ?: return
-        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
-        val homework = homeworkService.getHomeworkForLesson(user.currentLessonId) ?: return
+        val telegramId = query.from.id.chatId.long
+        if (parts.size < 3) {
+            logger.warn("handleHomeworkNext: invalid parts count ${parts.size}")
+            return
+        }
+        val homeworkId = parts[1].toIntOrNull() ?: run {
+            logger.warn("handleHomeworkNext: invalid homeworkId '${parts[1]}'")
+            return
+        }
+        val questionId = parts[2].toIntOrNull() ?: run {
+            logger.warn("handleHomeworkNext: invalid questionId '${parts[2]}'")
+            return
+        }
+        val user = userService.findByTelegramId(telegramId) ?: run {
+            logger.warn("handleHomeworkNext: user not found for telegramId=$telegramId")
+            return
+        }
+        val homework = homeworkService.getHomeworkById(homeworkId) ?: run {
+            logger.warn("handleHomeworkNext: homework not found for homeworkId=$homeworkId")
+            return
+        }
         val currentIndex = homework.questions.indexOfFirst { it.id == questionId }
         if (currentIndex < homework.questions.size - 1) {
             sendQuestion(context, query, homework.questions[currentIndex + 1], currentIndex + 1, homeworkId)
@@ -999,12 +1112,31 @@ class CallbackHandler(
     }
 
     private suspend fun handleHomeworkAddDictionary(context: BehaviourContext, query: DataCallbackQuery, parts: List<String>) {
-        if (parts.size < 3) return
-        val homeworkId = parts[1].toIntOrNull() ?: return
-        val questionId = parts[2].toIntOrNull() ?: return
-        val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
-        val homework = homeworkService.getHomeworkForLesson(user.currentLessonId) ?: return
-        val question = homework.questions.firstOrNull { it.id == questionId } ?: return
+        val telegramId = query.from.id.chatId.long
+        if (parts.size < 3) {
+            logger.warn("handleHomeworkAddDictionary: invalid parts count ${parts.size}")
+            return
+        }
+        val homeworkId = parts[1].toIntOrNull() ?: run {
+            logger.warn("handleHomeworkAddDictionary: invalid homeworkId '${parts[1]}'")
+            return
+        }
+        val questionId = parts[2].toIntOrNull() ?: run {
+            logger.warn("handleHomeworkAddDictionary: invalid questionId '${parts[2]}'")
+            return
+        }
+        val user = userService.findByTelegramId(telegramId) ?: run {
+            logger.warn("handleHomeworkAddDictionary: user not found for telegramId=$telegramId")
+            return
+        }
+        val homework = homeworkService.getHomeworkById(homeworkId) ?: run {
+            logger.warn("handleHomeworkAddDictionary: homework not found for homeworkId=$homeworkId")
+            return
+        }
+        val question = homework.questions.firstOrNull { it.id == questionId } ?: run {
+            logger.warn("handleHomeworkAddDictionary: question not found for questionId=$questionId")
+            return
+        }
         val vocabId = resolveHomeworkVocabularyId(homework.lessonId, question)
         if (vocabId != null) {
             dictionaryService.addFavorite(user.id, vocabId)
@@ -1038,11 +1170,13 @@ class CallbackHandler(
         val keyboard = InlineKeyboardMarkup(
             listOf(
                 listOf(dataInlineButton(S.btnRepeatTopic, "lesson_start:${homework.lessonId}")),
-                listOf(dataInlineButton(S.btnNextHomework, "next_homework:${homework.lessonId}"))
+                listOf(dataInlineButton(S.btnNextHomework, "next_homework:${homework.lessonId}")),
+                listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
             )
         )
 
-        context.sendHtml(query.from, "$resultText\n\n$feedback", replyMarkup = keyboard)
+        // Edit in place for smooth homework flow
+        context.editOrSendHtml(query, "$resultText\n\n$feedback", replyMarkup = keyboard)
     }
 
     private suspend fun buildHomeworkWrongButtons(

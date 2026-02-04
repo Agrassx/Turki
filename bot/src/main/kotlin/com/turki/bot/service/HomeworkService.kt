@@ -35,6 +35,15 @@ class HomeworkService(
         homeworkRepository.findByLessonId(lessonId)
 
     /**
+     * Retrieves homework by its database ID.
+     *
+     * @param homeworkId The homework's database ID
+     * @return The [Homework] if found, null otherwise
+     */
+    suspend fun getHomeworkById(homeworkId: Int): Homework? =
+        homeworkRepository.findById(homeworkId)
+
+    /**
      * Retrieves all questions for a homework assignment.
      *
      * @param homeworkId The homework's database ID
