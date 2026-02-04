@@ -22,6 +22,12 @@ class UserDictionaryRepositoryImpl : UserDictionaryRepository {
                 .singleOrNull()
         }
 
+    override suspend fun findByUser(userId: Long): List<UserDictionaryEntry> = DatabaseFactory.dbQuery {
+        UserDictionaryTable.selectAll()
+            .where { UserDictionaryTable.userId eq userId }
+            .map(::toEntry)
+    }
+
     override suspend fun upsert(entry: UserDictionaryEntry): UserDictionaryEntry = DatabaseFactory.dbQuery {
         val now = Clock.System.now()
         val updated = UserDictionaryTable.update({

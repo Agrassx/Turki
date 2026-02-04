@@ -69,6 +69,11 @@ interface LessonRepository {
     suspend fun findVocabularyById(id: Int): VocabularyItem?
 
     /**
+     * Retrieves vocabulary items by their database IDs.
+     */
+    suspend fun findVocabularyByIds(ids: List<Int>): List<VocabularyItem>
+
+    /**
      * Creates a new lesson in the database.
      *
      * @param lesson The lesson object to create

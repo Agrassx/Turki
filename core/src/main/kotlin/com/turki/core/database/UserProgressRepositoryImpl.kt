@@ -18,6 +18,12 @@ class UserProgressRepositoryImpl : UserProgressRepository {
             .singleOrNull()
     }
 
+    override suspend fun findByUser(userId: Long): List<UserProgress> = DatabaseFactory.dbQuery {
+        UserProgressTable.selectAll()
+            .where { UserProgressTable.userId eq userId }
+            .map(::toProgress)
+    }
+
     override suspend fun upsert(progress: UserProgress): UserProgress = DatabaseFactory.dbQuery {
         val now = Clock.System.now()
         val updated = UserProgressTable.update({

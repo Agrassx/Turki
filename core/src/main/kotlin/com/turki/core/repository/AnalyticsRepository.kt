@@ -8,4 +8,8 @@ interface AnalyticsRepository {
     suspend fun findByUserSince(userId: Long, since: Instant): List<AnalyticsEvent>
     suspend fun countByUserAndEvent(userId: Long, eventName: String, since: Instant): Long
     suspend fun deleteByUser(userId: Long): Boolean
+
+    // Metrics aggregations
+    suspend fun countEventsBetween(eventName: String, from: Instant, to: Instant): Long
+    suspend fun countDistinctUsersWithEventsBetween(from: Instant, to: Instant): Long
 }

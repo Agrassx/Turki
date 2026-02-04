@@ -280,12 +280,16 @@ suspend fun BehaviourContext.replaceWithHtml(
     sendHtml(query.from, text, replyMarkup)
 }
 
+/**
+ * Main keyboard with Russian labels shown at the bottom of the chat.
+ * These buttons trigger text messages that are handled by onText.
+ */
 fun mainCommandKeyboard(): ReplyKeyboardMarkup = ReplyKeyboardMarkup(
     keyboard = listOf(
         listOf(
-            SimpleKeyboardButton("/start"),
-            SimpleKeyboardButton("/menu"),
-            SimpleKeyboardButton("/help")
+            SimpleKeyboardButton("🏠 Меню"),
+            SimpleKeyboardButton("📚 Уроки"),
+            SimpleKeyboardButton("❓ Помощь")
         )
     ),
     resizeKeyboard = true,

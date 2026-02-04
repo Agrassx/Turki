@@ -145,3 +145,72 @@ object UserStatsTable : LongIdTable("$APP_SCHEMA.user_stats") {
     val weeklyHomework = integer("weekly_homework").default(0)
     val lastWeeklyReportAt = timestamp("last_weekly_report_at").nullable()
 }
+
+// Subscription system tables
+private const val BILLING_SCHEMA = "billing"
+
+object SubscriptionPlansTable : IntIdTable("$BILLING_SCHEMA.subscription_plans") {
+    val code = varchar("code", 32).uniqueIndex()
+    val name = varchar("name", 255)
+    val description = text("description")
+    val priceMonthly = long("price_monthly").default(0)
+    val priceYearly = long("price_yearly").default(0)
+    val maxLessons = integer("max_lessons").nullable()
+    val maxReviewsPerDay = integer("max_reviews_per_day").nullable()
+    val maxPracticePerDay = integer("max_practice_per_day").nullable()
+    val hasAds = bool("has_ads").default(true)
+    val hasOfflineAccess = bool("has_offline_access").default(false)
+    val hasPrioritySupport = bool("has_priority_support").default(false)
+    val features = text("features").nullable() // JSON array
+    val isActive = bool("is_active").default(true)
+    val sortOrder = integer("sort_order").default(0)
+    val createdAt = timestamp("created_at")
+    val updatedAt = timestamp("updated_at")
+}
+
+object UserSubscriptionsTable : LongIdTable("$BILLING_SCHEMA.user_subscriptions") {
+    val userId = reference("user_id", UsersTable).index()
+    val planId = reference("plan_id", SubscriptionPlansTable)
+    val status = varchar("status", 32)
+    val startedAt = timestamp("started_at")
+    val expiresAt = timestamp("expires_at").nullable()
+    val cancelledAt = timestamp("cancelled_at").nullable()
+    val autoRenew = bool("auto_renew").default(true)
+    val paymentProvider = varchar("payment_provider", 32).nullable()
+    val paymentProviderId = varchar("payment_provider_id", 255).nullable()
+    val metadata = text("metadata").nullable()
+    val createdAt = timestamp("created_at")
+    val updatedAt = timestamp("updated_at")
+}
+
+object PaymentTransactionsTable : LongIdTable("$BILLING_SCHEMA.payment_transactions") {
+    val userId = reference("user_id", UsersTable).index()
+    val subscriptionId = reference("subscription_id", UserSubscriptionsTable).nullable()
+    val amount = long("amount")
+    val currency = varchar("currency", 3).default("RUB")
+    val status = varchar("status", 32)
+    val paymentProvider = varchar("payment_provider", 32)
+    val paymentProviderId = varchar("payment_provider_id", 255).nullable()
+    val description = text("description").nullable()
+    val metadata = text("metadata").nullable()
+    val createdAt = timestamp("created_at")
+    val completedAt = timestamp("completed_at").nullable()
+}
+
+// Metrics tables
+object MetricsSnapshotsTable : LongIdTable("$LOGS_SCHEMA.metrics_snapshots") {
+    val date = varchar("date", 10).index() // YYYY-MM-DD
+    val metricName = varchar("metric_name", 64).index()
+    val value = long("value")
+    val metadata = text("metadata").nullable() // JSON for additional context
+    val createdAt = timestamp("created_at")
+}
+
+object ErrorLogsTable : LongIdTable("$LOGS_SCHEMA.error_logs") {
+    val errorType = varchar("error_type", 128)
+    val message = text("message")
+    val stackTrace = text("stack_trace").nullable()
+    val userId = long("user_id").nullable().index()
+    val context = text("context").nullable() // JSON with additional info
+    val createdAt = timestamp("created_at").index()
+}

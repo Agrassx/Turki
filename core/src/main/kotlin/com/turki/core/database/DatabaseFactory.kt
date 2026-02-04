@@ -71,6 +71,7 @@ object DatabaseFactory {
             exec("CREATE SCHEMA IF NOT EXISTS app")
             exec("CREATE SCHEMA IF NOT EXISTS logs")
             exec("CREATE SCHEMA IF NOT EXISTS metrics")
+            exec("CREATE SCHEMA IF NOT EXISTS billing")
 
             SchemaUtils.create(
                 UsersTable,
@@ -87,7 +88,14 @@ object DatabaseFactory {
                 ReviewCardsTable,
                 ReminderPreferencesTable,
                 AnalyticsEventsTable,
-                UserStatsTable
+                UserStatsTable,
+                // Billing/subscription tables
+                SubscriptionPlansTable,
+                UserSubscriptionsTable,
+                PaymentTransactionsTable,
+                // Metrics tables
+                MetricsSnapshotsTable,
+                ErrorLogsTable
             )
         }
     }

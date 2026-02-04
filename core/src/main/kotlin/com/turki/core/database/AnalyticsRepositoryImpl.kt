@@ -4,6 +4,7 @@ import com.turki.core.domain.AnalyticsEvent
 import com.turki.core.repository.AnalyticsRepository
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.deleteWhere
@@ -45,6 +46,33 @@ class AnalyticsRepositoryImpl : AnalyticsRepository {
 
     override suspend fun deleteByUser(userId: Long): Boolean = DatabaseFactory.dbQuery {
         AnalyticsEventsTable.deleteWhere { AnalyticsEventsTable.userId eq userId } > 0
+    }
+
+    override suspend fun countEventsBetween(
+        eventName: String,
+        from: kotlinx.datetime.Instant,
+        to: kotlinx.datetime.Instant
+    ): Long = DatabaseFactory.dbQuery {
+        AnalyticsEventsTable.selectAll()
+            .where {
+                (AnalyticsEventsTable.eventName eq eventName) and
+                    (AnalyticsEventsTable.createdAt greaterEq from) and
+                    (AnalyticsEventsTable.createdAt less to)
+            }
+            .count()
+    }
+
+    override suspend fun countDistinctUsersWithEventsBetween(
+        from: kotlinx.datetime.Instant,
+        to: kotlinx.datetime.Instant
+    ): Long = DatabaseFactory.dbQuery {
+        AnalyticsEventsTable.select(AnalyticsEventsTable.userId)
+            .where {
+                (AnalyticsEventsTable.createdAt greaterEq from) and
+                    (AnalyticsEventsTable.createdAt less to)
+            }
+            .withDistinct()
+            .count()
     }
 
     private fun toEvent(row: org.jetbrains.exposed.sql.ResultRow): AnalyticsEvent = AnalyticsEvent(

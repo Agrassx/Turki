@@ -87,6 +87,13 @@ class LessonRepositoryImpl : LessonRepository {
             .singleOrNull()
     }
 
+    override suspend fun findVocabularyByIds(ids: List<Int>): List<VocabularyItem> = DatabaseFactory.dbQuery {
+        if (ids.isEmpty()) return@dbQuery emptyList()
+        VocabularyTable.selectAll()
+            .where { VocabularyTable.id inList ids }
+            .map(::toVocabulary)
+    }
+
     override suspend fun create(lesson: Lesson): Lesson = DatabaseFactory.dbQuery {
         val id = LessonsTable.insert {
             it[orderIndex] = lesson.orderIndex

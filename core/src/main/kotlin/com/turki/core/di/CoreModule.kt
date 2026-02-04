@@ -12,7 +12,11 @@ import com.turki.core.database.UserProgressRepositoryImpl
 import com.turki.core.database.UserStateRepositoryImpl
 import com.turki.core.database.UserStatsRepositoryImpl
 import com.turki.core.database.ReviewRepositoryImpl
+import com.turki.core.database.MetricsRepositoryImpl
+import com.turki.core.database.SubscriptionRepositoryImpl
 import com.turki.core.repository.AnalyticsRepository
+import com.turki.core.repository.MetricsRepository
+import com.turki.core.repository.SubscriptionRepository
 import com.turki.core.repository.HomeworkRepository
 import com.turki.core.repository.LessonRepository
 import com.turki.core.repository.ReminderPreferenceRepository
@@ -40,5 +44,7 @@ val coreModule = module {
     single<ReminderPreferenceRepository> { ReminderPreferenceRepositoryImpl() }
     single<AnalyticsRepository> { AnalyticsRepositoryImpl() }
     single<UserStatsRepository> { UserStatsRepositoryImpl() }
+    single<SubscriptionRepository> { SubscriptionRepositoryImpl() }
+    single<MetricsRepository> { MetricsRepositoryImpl() }
     single { DataImportService() }
 }

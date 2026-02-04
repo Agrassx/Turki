@@ -3,19 +3,23 @@ package com.turki.bot.handler
 import com.turki.bot.i18n.S
 import com.turki.bot.service.AnalyticsService
 import com.turki.bot.service.DictionaryService
+import com.turki.core.domain.EventNames
 import com.turki.bot.service.ExerciseService
 import com.turki.bot.service.LessonService
 import com.turki.bot.service.ProgressService
 import com.turki.bot.service.ReminderPreferenceService
 import com.turki.bot.service.ReviewService
+import com.turki.bot.service.UserDataService
 import com.turki.bot.service.UserService
 import com.turki.bot.service.UserStateService
 import com.turki.bot.service.UserFlowState
 import com.turki.bot.util.markdownToHtml
 import com.turki.bot.util.sendHtml
 import com.turki.core.domain.Language
+import dev.inmo.tgbotapi.extensions.api.send.media.sendDocument
 import dev.inmo.tgbotapi.extensions.behaviour_builder.BehaviourContext
 import dev.inmo.tgbotapi.extensions.utils.extensions.raw.from
+import dev.inmo.tgbotapi.requests.abstracts.asMultipartFile
 import dev.inmo.tgbotapi.types.buttons.InlineKeyboardMarkup
 import dev.inmo.tgbotapi.types.buttons.inline.dataInlineButton
 import dev.inmo.tgbotapi.types.message.abstracts.CommonMessage
@@ -44,12 +48,14 @@ class CommandHandler(
     @Suppress("unused") private val exerciseService: ExerciseService,
     private val userStateService: UserStateService,
     private val analyticsService: AnalyticsService,
-    private val reminderPreferenceService: ReminderPreferenceService
+    private val reminderPreferenceService: ReminderPreferenceService,
+    private val userDataService: UserDataService
 ) {
     private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
 
     suspend fun handleStart(context: BehaviourContext, message: CommonMessage<TextContent>) {
         val from = message.from ?: return
+        val isNewUser = userService.findByTelegramId(from.id.chatId.long) == null
         val user = userService.findOrCreateUser(
             telegramId = from.id.chatId.long,
             username = from.username?.username,
@@ -57,7 +63,13 @@ class CommandHandler(
             lastName = from.lastName
         )
 
-        analyticsService.log("onboarding_started", user.id)
+        if (isNewUser) {
+            analyticsService.log(EventNames.USER_REGISTERED, user.id)
+        } else {
+            analyticsService.log(EventNames.USER_RETURNED, user.id)
+        }
+        analyticsService.log(EventNames.SESSION_START, user.id)
+        analyticsService.log(EventNames.COMMAND_USED, user.id, props = mapOf("command" to "start"))
         context.sendHtml(message.chat, S.welcome(user.firstName))
         sendMainMenu(context, message, user, S.mainMenuTitle)
     }
@@ -69,12 +81,16 @@ class CommandHandler(
             return
         }
 
+        analyticsService.log(EventNames.COMMAND_USED, user.id, props = mapOf("command" to "lesson"))
+
         val lesson = lessonService.getLessonById(user.currentLessonId)
 
         if (lesson == null) {
             context.sendHtml(message.chat, S.allLessonsCompleted)
             return
         }
+
+        analyticsService.log(EventNames.LESSON_STARTED, user.id, props = mapOf("lessonId" to lesson.id.toString()))
 
         val lessonText = buildString {
             appendLine(S.lessonTitle(lesson.orderIndex, lesson.title))
@@ -110,6 +126,8 @@ class CommandHandler(
             return
         }
 
+        analyticsService.log(EventNames.COMMAND_USED, user.id, props = mapOf("command" to "homework"))
+
         context.sendHtml(
             message.chat,
             S.homeworkStart,
@@ -132,6 +150,8 @@ class CommandHandler(
             return
         }
 
+        analyticsService.log(EventNames.COMMAND_USED, user.id, props = mapOf("command" to "progress"))
+
         val summary = progressService.getProgressSummary(user.id)
 
         val progressText = S.progress(
@@ -147,6 +167,11 @@ class CommandHandler(
     }
 
     suspend fun handleHelp(context: BehaviourContext, message: CommonMessage<TextContent>) {
+        val from = message.from
+        val userId = from?.let { userService.findByTelegramId(it.id.chatId.long)?.id }
+        if (userId != null) {
+            analyticsService.log(EventNames.COMMAND_USED, userId, props = mapOf("command" to "help"))
+        }
         context.sendHtml(message.chat, S.help)
     }
 
@@ -160,6 +185,8 @@ class CommandHandler(
             context.sendHtml(message.chat, S.notRegistered)
             return
         }
+
+        analyticsService.log(EventNames.COMMAND_USED, user.id, props = mapOf("command" to "vocabulary"))
 
         val vocabulary = lessonService.getVocabulary(user.currentLessonId)
 
@@ -188,6 +215,7 @@ class CommandHandler(
             context.sendHtml(message.chat, S.notRegistered)
             return
         }
+        analyticsService.log(EventNames.COMMAND_USED, user.id, props = mapOf("command" to "menu"))
         sendMainMenu(context, message, user, S.menuTitle)
     }
 
@@ -197,6 +225,8 @@ class CommandHandler(
             context.sendHtml(message.chat, S.notRegistered)
             return
         }
+
+        analyticsService.log(EventNames.COMMAND_USED, user.id, props = mapOf("command" to "lessons"))
 
         val lessons = lessonService.getLessonsByLanguage(Language.TURKISH)
         val completed = progressService.getCompletedLessonIds(user.id)
@@ -230,6 +260,7 @@ class CommandHandler(
             context.sendHtml(message.chat, S.notRegistered)
             return
         }
+        analyticsService.log(EventNames.COMMAND_USED, user.id, props = mapOf("command" to "practice"))
         context.sendHtml(message.chat, S.practiceIntro)
         context.sendHtml(
             message.chat,
@@ -246,6 +277,8 @@ class CommandHandler(
             context.sendHtml(message.chat, S.notRegistered)
             return
         }
+
+        analyticsService.log(EventNames.COMMAND_USED, user.id, props = mapOf("command" to "dictionary"))
 
         val text = message.content.text
         val query = text.removePrefix("/dictionary").trim()
@@ -290,6 +323,7 @@ class CommandHandler(
             context.sendHtml(message.chat, S.notRegistered)
             return
         }
+        analyticsService.log(EventNames.COMMAND_USED, user.id, props = mapOf("command" to "review"))
         context.sendHtml(
             message.chat,
             S.reviewIntro,
@@ -303,6 +337,7 @@ class CommandHandler(
             context.sendHtml(message.chat, S.notRegistered)
             return
         }
+        analyticsService.log(EventNames.COMMAND_USED, user.id, props = mapOf("command" to "reminders"))
         val pref = reminderPreferenceService.getOrDefault(user.id)
         val status = if (pref.isEnabled) S.reminderStatusOn(pref.daysOfWeek, pref.timeLocal)
         else S.reminderStatusOff
@@ -326,6 +361,7 @@ class CommandHandler(
             context.sendHtml(message.chat, S.notRegistered)
             return
         }
+        analyticsService.log(EventNames.COMMAND_USED, user.id, props = mapOf("command" to "reset"))
         context.sendHtml(
             message.chat,
             S.resetProgressConfirm,
@@ -336,7 +372,6 @@ class CommandHandler(
                 )
             )
         )
-        analyticsService.log("reset_initiated", user.id)
     }
 
     suspend fun handleDelete(context: BehaviourContext, message: CommonMessage<TextContent>) {
@@ -345,6 +380,7 @@ class CommandHandler(
             context.sendHtml(message.chat, S.notRegistered)
             return
         }
+        analyticsService.log(EventNames.COMMAND_USED, user.id, props = mapOf("command" to "delete"))
         context.sendHtml(
             message.chat,
             S.deleteDataConfirm,
@@ -355,6 +391,41 @@ class CommandHandler(
                 )
             )
         )
+    }
+
+    suspend fun handleExport(context: BehaviourContext, message: CommonMessage<TextContent>) {
+        val from = message.from ?: return
+        val user = userService.findByTelegramId(from.id.chatId.long) ?: run {
+            context.sendHtml(message.chat, S.notRegistered)
+            return
+        }
+
+        analyticsService.log(EventNames.COMMAND_USED, user.id, props = mapOf("command" to "export"))
+        context.sendHtml(message.chat, S.exportDataPreparing)
+
+        val exportJson = userDataService.exportUserData(user)
+        val fileName = "turki_data_${user.telegramId}.json"
+        val fileBytes = exportJson.toByteArray(Charsets.UTF_8)
+
+        context.sendDocument(
+            message.chat,
+            fileBytes.asMultipartFile(fileName),
+            text = S.exportDataReady
+        )
+
+        analyticsService.log(EventNames.DATA_EXPORTED, user.id)
+    }
+
+    suspend fun handleSupport(context: BehaviourContext, message: CommonMessage<TextContent>) {
+        val from = message.from ?: return
+        val user = userService.findByTelegramId(from.id.chatId.long) ?: run {
+            context.sendHtml(message.chat, S.notRegistered)
+            return
+        }
+
+        analyticsService.log(EventNames.COMMAND_USED, user.id, props = mapOf("command" to "support"))
+        userStateService.set(user.id, UserFlowState.SUPPORT_MESSAGE.name, "{}")
+        context.sendHtml(message.chat, S.supportPrompt)
     }
 
     private suspend fun handleDictionaryQuery(
@@ -382,7 +453,7 @@ class CommandHandler(
             appendLine(S.dictionaryTags(tagsText))
         }
 
-        analyticsService.log("dict_search", userId, props = mapOf("queryLen" to query.length.toString()))
+        analyticsService.log(EventNames.DICTIONARY_SEARCH, userId, props = mapOf("queryLen" to query.length.toString()))
 
         context.sendHtml(
             message.chat,

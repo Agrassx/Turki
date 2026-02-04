@@ -114,6 +114,9 @@ interface Strings {
     val continueNothing: String
     val deleteDataConfirm: String
     val deleteDataSuccess: String
+    val exportDataPreparing: String
+    val exportDataReady: String
+    val exportDataEmpty: String
     val selectLevelTitle: String
     val levelA1Active: String
     fun levelLocked(level: String): String
@@ -173,4 +176,10 @@ interface Strings {
     val reminderLesson: String
     val reminderHomework: String
     val reminderSubscription: String
+
+    // Support
+    val supportPrompt: String
+    val supportSent: String
+    val supportReply: String
+    fun supportMessageToAdmin(userId: Long, username: String?, firstName: String, message: String): String
 }

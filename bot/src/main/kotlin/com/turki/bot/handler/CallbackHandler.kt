@@ -3,6 +3,7 @@ package com.turki.bot.handler
 import com.turki.bot.i18n.S
 import com.turki.bot.service.AnalyticsService
 import com.turki.bot.service.DictionaryService
+import com.turki.core.domain.EventNames
 import com.turki.bot.service.ExerciseService
 import com.turki.bot.service.HomeworkService
 import com.turki.bot.service.LessonService
@@ -215,7 +216,7 @@ class CallbackHandler(
             )
         )
         if (user != null) {
-            analyticsService.log("lesson_list_opened", user.id)
+            analyticsService.log(EventNames.LESSONS_LIST_OPENED, user.id)
         }
     }
 
@@ -273,7 +274,7 @@ class CallbackHandler(
             return
         }
         progressService.markLessonStarted(user.id, lesson.id)
-        analyticsService.log("lesson_opened", user.id, props = mapOf("lessonId" to lesson.id.toString()))
+        analyticsService.log(EventNames.LESSON_STARTED, user.id, props = mapOf("lessonId" to lesson.id.toString()))
     }
 
     private suspend fun handleVocabularyCallback(
@@ -496,7 +497,7 @@ class CallbackHandler(
         val verdict = if (isCorrect) S.exerciseCorrect else S.exerciseIncorrect
 
         analyticsService.log(
-            "exercise_answered",
+            EventNames.EXERCISE_ANSWERED,
             user.id,
             props = mapOf("isCorrect" to isCorrect.toString())
         )
@@ -577,7 +578,7 @@ class CallbackHandler(
         }
 
         analyticsService.log(
-            "exercise_started",
+            EventNames.PRACTICE_STARTED,
             userService.findByTelegramId(query.from.id.chatId.long)?.id ?: return,
             props = mapOf("type" to "vocab_mcq")
         )
@@ -679,7 +680,7 @@ class CallbackHandler(
         }
         val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
         dictionaryService.toggleFavorite(user.id, vocabId)
-        analyticsService.log("word_favorited", user.id, props = mapOf("itemId" to vocabId.toString()))
+        analyticsService.log(EventNames.WORD_ADDED_TO_DICTIONARY, user.id, props = mapOf("itemId" to vocabId.toString()))
         // Return to dictionary list with updated state
         handleDictionaryList(context, query, 0)
     }
@@ -776,7 +777,7 @@ class CallbackHandler(
         }
 
         userStateService.set(user.id, UserFlowState.REVIEW.name, json.encodeToString(session))
-        analyticsService.log("review_started", user.id, props = mapOf("difficulty" to difficulty.name))
+        analyticsService.log(EventNames.REVIEW_STARTED, user.id, props = mapOf("difficulty" to difficulty.name))
         sendReviewSessionQuestion(context, query, session)
     }
 
@@ -892,7 +893,7 @@ class CallbackHandler(
                     )
                 )
             )
-            analyticsService.log("review_completed", user.id, props = mapOf(
+            analyticsService.log(EventNames.REVIEW_COMPLETED, user.id, props = mapOf(
                 "correct" to newCorrectCount.toString(),
                 "total" to session.questions.size.toString()
             ))
@@ -975,7 +976,7 @@ class CallbackHandler(
         }
         reviewService.updateCard(user.id, vocabId, isCorrect)
         progressService.recordReview(user.id)
-        analyticsService.log("review_completed", user.id, props = mapOf("isCorrect" to isCorrect.toString()))
+        analyticsService.log(EventNames.REVIEW_COMPLETED, user.id, props = mapOf("isCorrect" to isCorrect.toString()))
 
         val state = userStateService.get(user.id) ?: run {
             logger.warn("handleReviewAnswer: no state for user=${user.id}")
@@ -1190,7 +1191,7 @@ class CallbackHandler(
         val user = userService.findByTelegramId(telegramId) ?: return
 
         val pref = reminderPreferenceService.setSchedule(user.id, days, time)
-        analyticsService.log("reminder_set", user.id, props = mapOf("schedule" to "${pref.daysOfWeek} ${pref.timeLocal}"))
+        analyticsService.log(EventNames.REMINDER_CONFIGURED, user.id, props = mapOf("schedule" to "${pref.daysOfWeek} ${pref.timeLocal}"))
 
         context.editOrSendHtml(
             query,
@@ -1203,8 +1204,8 @@ class CallbackHandler(
 
     private fun formatDaysForDisplay(days: String): String {
         val dayMap = mapOf(
-            "MON" to "Пн", "TUE" to "Вт", "WED" to "Ср",
-            "THU" to "Чт", "FRI" to "Пт", "SAT" to "Сб", "SUN" to "Вс"
+            "MON" to "Понедельник", "TUE" to "Вторник", "WED" to "Среда",
+            "THU" to "Четверг", "FRI" to "Пятница", "SAT" to "Суббота", "SUN" to "Воскресенье"
         )
         return days.split(",").mapNotNull { dayMap[it] }.joinToString(", ")
     }
@@ -1212,7 +1213,7 @@ class CallbackHandler(
     private suspend fun handleReminderEnableWeekdays(context: BehaviourContext, query: DataCallbackQuery) {
         val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
         val pref = reminderPreferenceService.setSchedule(user.id, "MON,TUE,WED,THU,FRI", "19:00")
-        analyticsService.log("reminder_set", user.id, props = mapOf("schedule" to "${pref.daysOfWeek} ${pref.timeLocal}"))
+        analyticsService.log(EventNames.REMINDER_CONFIGURED, user.id, props = mapOf("schedule" to "${pref.daysOfWeek} ${pref.timeLocal}"))
         context.editOrSendHtml(
             query,
             S.reminderEnabled(formatDaysForDisplay(pref.daysOfWeek), pref.timeLocal),
@@ -1297,7 +1298,7 @@ class CallbackHandler(
         )
         val user = userService.findByTelegramId(query.from.id.chatId.long)
         if (user != null) {
-            analyticsService.log("hw_opened", user.id, props = mapOf("lessonId" to lessonId.toString()))
+            analyticsService.log(EventNames.HOMEWORK_STARTED, user.id, props = mapOf("lessonId" to lessonId.toString()))
         }
     }
 
@@ -1344,7 +1345,7 @@ class CallbackHandler(
         }
 
         sendQuestion(context, query, homework.questions.first(), 0, homework.id)
-        analyticsService.log("hw_opened", user.id, props = mapOf("lessonId" to lessonId.toString()))
+        analyticsService.log(EventNames.HOMEWORK_STARTED, user.id, props = mapOf("lessonId" to lessonId.toString()))
     }
 
     private suspend fun sendQuestion(
@@ -1532,8 +1533,9 @@ class CallbackHandler(
         progressService.recordHomework(user.id)
         if (submission.score == submission.maxScore) {
             progressService.markLessonCompleted(user.id, homework.lessonId)
+            analyticsService.log(EventNames.LESSON_COMPLETED, user.id, props = mapOf("lessonId" to homework.lessonId.toString()))
         }
-        analyticsService.log("hw_submitted", user.id, props = mapOf("score" to submission.score.toString()))
+        analyticsService.log(EventNames.HOMEWORK_COMPLETED, user.id, props = mapOf("score" to submission.score.toString()))
 
         val resultText = if (submission.score == submission.maxScore) {
             S.homeworkComplete(submission.score, submission.maxScore)
@@ -1614,7 +1616,7 @@ class CallbackHandler(
                 listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
             )
         )
-        analyticsService.log("progress_opened", user.id)
+        analyticsService.log(EventNames.PROGRESS_VIEWED, user.id)
     }
 
     private suspend fun handleNextLessonCallback(context: BehaviourContext, query: DataCallbackQuery) {

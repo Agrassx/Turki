@@ -7,7 +7,8 @@ enum class UserFlowState {
     REVIEW,
     DICT_SEARCH,
     DICT_ADD_CUSTOM,
-    HOMEWORK_TEXT
+    HOMEWORK_TEXT,
+    SUPPORT_MESSAGE
 }
 
 @Serializable
