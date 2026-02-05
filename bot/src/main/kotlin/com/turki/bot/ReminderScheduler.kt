@@ -32,7 +32,7 @@ private val analyticsService: AnalyticsService by inject(AnalyticsService::class
 suspend fun startReminderScheduler(
     bot: TelegramBot,
     clock: Clock = Clock.System,
-    timeZone: TimeZone = TimeZone.currentSystemDefault()
+    timeZone: TimeZone = TimeZone.of("Europe/Moscow")
 ) {
     while (true) {
         try {
@@ -69,6 +69,19 @@ suspend fun startReminderScheduler(
     }
 }
 
+/**
+ * Maps abbreviated day codes (MON, TUE, ...) stored in DB to [DayOfWeek].
+ */
+private val dayCodeToEnum = mapOf(
+    "MON" to DayOfWeek.MONDAY,
+    "TUE" to DayOfWeek.TUESDAY,
+    "WED" to DayOfWeek.WEDNESDAY,
+    "THU" to DayOfWeek.THURSDAY,
+    "FRI" to DayOfWeek.FRIDAY,
+    "SAT" to DayOfWeek.SATURDAY,
+    "SUN" to DayOfWeek.SUNDAY
+)
+
 private suspend fun sendScheduledReminders(
     bot: TelegramBot,
     clock: Clock,
@@ -81,28 +94,27 @@ private suspend fun sendScheduledReminders(
     val currentTime = "%02d:%02d".format(local.hour, local.minute)
 
     users.forEach { user ->
-        val pref = reminderPreferenceService.getOrDefault(user.id)
-        if (!pref.isEnabled) {
-            return@forEach
-        }
-        if (!pref.daysOfWeek.split(",").contains(currentDay.name)) {
-            return@forEach
-        }
-        if (pref.timeLocal != currentTime) {
-            return@forEach
-        }
-        val lastFired = pref.lastFiredAt?.toLocalDateTime(timeZone)?.date
-        if (lastFired == local.date) {
-            return@forEach
-        }
+        try {
+            val pref = reminderPreferenceService.getOrDefault(user.id)
+            if (!pref.isEnabled) return@forEach
 
-        bot.sendMessage(
-            chatId = ChatId(RawChatId(user.telegramId)),
-            text = S.reminderLesson,
-            parseMode = HTMLParseMode
-        )
-        reminderPreferenceService.markFired(user.id)
-        analyticsService.log("reminder_fired", user.id)
+            val activeDays = pref.daysOfWeek.split(",").mapNotNull { dayCodeToEnum[it.trim()] }
+            if (currentDay !in activeDays) return@forEach
+            if (pref.timeLocal != currentTime) return@forEach
+
+            val lastFired = pref.lastFiredAt?.toLocalDateTime(timeZone)?.date
+            if (lastFired == local.date) return@forEach
+
+            bot.sendMessage(
+                chatId = ChatId(RawChatId(user.telegramId)),
+                text = S.reminderLesson,
+                parseMode = HTMLParseMode
+            )
+            reminderPreferenceService.markFired(user.id)
+            analyticsService.log("reminder_fired", user.id)
+        } catch (e: Exception) {
+            logger.warn("Failed to send scheduled reminder to userId=${user.id}: ${e.message}")
+        }
     }
 }
 
@@ -119,23 +131,26 @@ private suspend fun sendWeeklyReports(
     }
 
     users.forEach { user ->
-        val stats = progressService.getWeeklyStats(user.id)
-        val lastReportDate = stats.lastWeeklyReportAt?.toLocalDateTime(timeZone)?.date
-        if (lastReportDate == local.date) {
-            return@forEach
+        try {
+            val stats = progressService.getWeeklyStats(user.id)
+            val lastReportDate = stats.lastWeeklyReportAt?.toLocalDateTime(timeZone)?.date
+            if (lastReportDate == local.date) return@forEach
+
+            val report = S.weeklyReport(
+                lessons = stats.weeklyLessons,
+                practice = stats.weeklyPractice,
+                review = stats.weeklyReview,
+                homework = stats.weeklyHomework
+            )
+            bot.sendMessage(
+                chatId = ChatId(RawChatId(user.telegramId)),
+                text = report,
+                parseMode = HTMLParseMode
+            )
+            progressService.resetWeekly(user.id)
+            analyticsService.log("weekly_report_sent", user.id)
+        } catch (e: Exception) {
+            logger.warn("Failed to send weekly report to userId=${user.id}: ${e.message}")
         }
-        val report = S.weeklyReport(
-            lessons = stats.weeklyLessons,
-            practice = stats.weeklyPractice,
-            review = stats.weeklyReview,
-            homework = stats.weeklyHomework
-        )
-        bot.sendMessage(
-            chatId = ChatId(RawChatId(user.telegramId)),
-            text = report,
-            parseMode = HTMLParseMode
-        )
-        progressService.resetWeekly(user.id)
-        analyticsService.log("weekly_report_sent", user.id)
     }
 }

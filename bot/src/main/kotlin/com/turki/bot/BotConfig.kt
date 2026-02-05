@@ -174,6 +174,10 @@ private fun launchSchedulers(bot: dev.inmo.tgbotapi.bot.TelegramBot) {
     }
 
     CoroutineScope(Dispatchers.Default).launch {
+        sendStartupReport(bot)
+    }
+
+    CoroutineScope(Dispatchers.Default).launch {
         startDailyReportScheduler(bot)
     }
 }

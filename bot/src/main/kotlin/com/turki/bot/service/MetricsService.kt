@@ -200,6 +200,32 @@ class MetricsService(
     }
 
     /**
+     * Send a startup report so the admin knows the bot is alive and sees current metrics.
+     */
+    suspend fun sendStartupReport(bot: TelegramBot) {
+        if (statsChatId == null) return
+
+        try {
+            val report = generateDailyReport()
+            val message = """
+🟢 <b>Бот запущен!</b>
+⏰ ${clock.now().toLocalDateTime(TimeZone.of("Europe/Moscow"))}
+
+${formatReportMessage(report)}
+            """.trimIndent()
+
+            bot.sendMessage(
+                chatId = ChatId(RawChatId(statsChatId)),
+                text = message,
+                parseMode = HTMLParseMode
+            )
+            logger.info("Startup report sent successfully")
+        } catch (e: Exception) {
+            logger.error("Failed to send startup report: ${e.message}", e)
+        }
+    }
+
+    /**
      * Send error alert to stats chat.
      */
     suspend fun sendErrorAlert(bot: TelegramBot, errorType: String, message: String, userId: Long? = null) {

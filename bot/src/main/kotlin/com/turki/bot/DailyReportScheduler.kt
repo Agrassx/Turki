@@ -14,6 +14,23 @@ private val metricsService: MetricsService by inject(MetricsService::class.java)
 
 private const val POST_REPORT_DELAY_MS = 60_000L
 private const val ERROR_RETRY_DELAY_MS = 300_000L
+private const val STARTUP_DELAY_MS = 5_000L
+
+/**
+ * Send a report immediately on bot startup so the admin knows the bot is alive.
+ */
+suspend fun sendStartupReport(bot: TelegramBot) {
+    if (!metricsService.isConfigured()) return
+
+    try {
+        // Small delay to let Koin and DB fully initialize
+        delay(STARTUP_DELAY_MS)
+        logger.info("Sending startup report...")
+        metricsService.sendStartupReport(bot)
+    } catch (e: Exception) {
+        logger.error("Failed to send startup report: ${e.message}")
+    }
+}
 
 /**
  * Scheduler for sending daily reports.
