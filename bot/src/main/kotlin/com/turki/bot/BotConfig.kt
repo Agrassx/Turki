@@ -3,14 +3,7 @@ package com.turki.bot
 import com.turki.bot.handler.CallbackHandler
 import com.turki.bot.handler.CommandHandler
 import com.turki.bot.handler.HomeworkHandler
-import com.turki.bot.service.AnalyticsService
-import com.turki.bot.service.DictionaryService
-import com.turki.bot.service.HomeworkService
-import com.turki.bot.service.LessonService
-import com.turki.bot.service.ProgressService
-import com.turki.bot.service.ReminderPreferenceService
 import com.turki.bot.service.SupportService
-import com.turki.bot.service.UserDataService
 import com.turki.bot.service.UserService
 import com.turki.bot.service.UserStateService
 import com.turki.bot.service.UserFlowState
@@ -32,16 +25,11 @@ import kotlinx.coroutines.launch
 import org.koin.java.KoinJavaComponent.inject
 
 private val userService: UserService by inject(UserService::class.java)
-private val lessonService: LessonService by inject(LessonService::class.java)
-private val homeworkService: HomeworkService by inject(HomeworkService::class.java)
 private val userStateService: UserStateService by inject(UserStateService::class.java)
-private val progressService: ProgressService by inject(ProgressService::class.java)
-private val dictionaryService: DictionaryService by inject(DictionaryService::class.java)
-private val reminderPreferenceService: ReminderPreferenceService by inject(ReminderPreferenceService::class.java)
-private val analyticsService: AnalyticsService by inject(AnalyticsService::class.java)
-private val userDataService: UserDataService by inject(UserDataService::class.java)
 private val supportService: SupportService by inject(SupportService::class.java)
 private val callbackHandler: CallbackHandler by inject(CallbackHandler::class.java)
+private val commandHandler: CommandHandler by inject(CommandHandler::class.java)
+private val homeworkHandler: HomeworkHandler by inject(HomeworkHandler::class.java)
 
 private data class BotHandlers(
     val commandHandler: CommandHandler,
@@ -67,37 +55,26 @@ fun Application.configureBot() {
 }
 
 private fun buildHandlers(): BotHandlers {
-    val commandHandler = CommandHandler(
-        userService,
-        lessonService,
-        progressService,
-        dictionaryService,
-        userStateService,
-        analyticsService,
-        reminderPreferenceService,
-        userDataService
-    )
-    val homeworkHandler = HomeworkHandler(homeworkService)
     return BotHandlers(commandHandler, callbackHandler, homeworkHandler)
 }
 
 private suspend fun BehaviourContext.registerCommandHandlers(commandHandler: CommandHandler) {
-    onCommand("start") { message -> commandHandler.handleStart(this, message) }
-    onCommand("lesson") { message -> commandHandler.handleLesson(this, message) }
-    onCommand("menu") { message -> commandHandler.handleMenu(this, message) }
-    onCommand("lessons") { message -> commandHandler.handleLessons(this, message) }
-    onCommand("practice") { message -> commandHandler.handlePractice(this, message) }
-    onCommand("dictionary") { message -> commandHandler.handleDictionary(this, message) }
-    onCommand("review") { message -> commandHandler.handleReview(this, message) }
-    onCommand("homework") { message -> commandHandler.handleHomework(this, message) }
-    onCommand("progress") { message -> commandHandler.handleProgress(this, message) }
-    onCommand("reminders") { message -> commandHandler.handleReminders(this, message) }
-    onCommand("reset") { message -> commandHandler.handleReset(this, message) }
-    onCommand("delete") { message -> commandHandler.handleDelete(this, message) }
-    onCommand("export") { message -> commandHandler.handleExport(this, message) }
-    onCommand("support") { message -> commandHandler.handleSupport(this, message) }
-    onCommand("help") { message -> commandHandler.handleHelp(this, message) }
-    onCommand("vocabulary") { message -> commandHandler.handleVocabulary(this, message) }
+    onCommand("start") { message -> commandHandler.handleCommand("start", this, message) }
+    onCommand("lesson") { message -> commandHandler.handleCommand("lesson", this, message) }
+    onCommand("menu") { message -> commandHandler.handleCommand("menu", this, message) }
+    onCommand("lessons") { message -> commandHandler.handleCommand("lessons", this, message) }
+    onCommand("practice") { message -> commandHandler.handleCommand("practice", this, message) }
+    onCommand("dictionary") { message -> commandHandler.handleCommand("dictionary", this, message) }
+    onCommand("review") { message -> commandHandler.handleCommand("review", this, message) }
+    onCommand("homework") { message -> commandHandler.handleCommand("homework", this, message) }
+    onCommand("progress") { message -> commandHandler.handleCommand("progress", this, message) }
+    onCommand("reminders") { message -> commandHandler.handleCommand("reminders", this, message) }
+    onCommand("reset") { message -> commandHandler.handleCommand("reset", this, message) }
+    onCommand("delete") { message -> commandHandler.handleCommand("delete", this, message) }
+    onCommand("export") { message -> commandHandler.handleCommand("export", this, message) }
+    onCommand("support") { message -> commandHandler.handleCommand("support", this, message) }
+    onCommand("help") { message -> commandHandler.handleCommand("help", this, message) }
+    onCommand("vocabulary") { message -> commandHandler.handleCommand("vocabulary", this, message) }
 }
 
 private suspend fun BehaviourContext.registerCallbackHandlers(
@@ -133,15 +110,15 @@ private suspend fun BehaviourContext.registerUserTextHandlers(
         // Handle keyboard button presses (Russian labels)
         when (text) {
             "🏠 Меню" -> {
-                commandHandler.handleMenu(this, message)
+                commandHandler.handleCommand("menu", this, message)
                 return@onText
             }
             "📚 Уроки" -> {
-                commandHandler.handleLessons(this, message)
+                commandHandler.handleCommand("lessons", this, message)
                 return@onText
             }
             "❓ Помощь" -> {
-                commandHandler.handleHelp(this, message)
+                commandHandler.handleCommand("help", this, message)
                 return@onText
             }
         }
@@ -158,11 +135,11 @@ private suspend fun BehaviourContext.registerUserTextHandlers(
         when (state?.state) {
             UserFlowState.DICT_SEARCH.name -> {
                 userStateService.clear(user.id)
-                commandHandler.handleDictionaryQueryText(this, message)
+                commandHandler.handleTextState(UserFlowState.DICT_SEARCH, this, message)
             }
             UserFlowState.DICT_ADD_CUSTOM.name -> {
                 userStateService.clear(user.id)
-                commandHandler.handleDictionaryCustomText(this, message)
+                commandHandler.handleTextState(UserFlowState.DICT_ADD_CUSTOM, this, message)
             }
             UserFlowState.SUPPORT_MESSAGE.name -> {
                 userStateService.clear(user.id)

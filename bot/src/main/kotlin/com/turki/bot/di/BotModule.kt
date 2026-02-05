@@ -1,6 +1,8 @@
 package com.turki.bot.di
 
 import com.turki.bot.handler.CallbackHandler
+import com.turki.bot.handler.CommandHandler
+import com.turki.bot.handler.HomeworkHandler
 import com.turki.bot.handler.callback.CallbackAction
 import com.turki.bot.handler.callback.dictionary.DictAddCustomAction
 import com.turki.bot.handler.callback.dictionary.DictFavAction
@@ -53,6 +55,28 @@ import com.turki.bot.handler.callback.vocabulary.VocabListAction
 import com.turki.bot.handler.callback.vocabulary.VocabRemoveAction
 import com.turki.bot.handler.callback.vocabulary.VocabWordAction
 import com.turki.bot.handler.callback.vocabulary.VocabularyAction
+import com.turki.bot.handler.command.CommandAction
+import com.turki.bot.handler.command.CommandTextAction
+import com.turki.bot.handler.command.dictionary.DictionaryCommand
+import com.turki.bot.handler.command.dictionary.DictionaryCustomTextAction
+import com.turki.bot.handler.command.dictionary.DictionaryQueryTextAction
+import com.turki.bot.handler.command.lesson.HomeworkCommand
+import com.turki.bot.handler.command.lesson.LessonCommand
+import com.turki.bot.handler.command.lesson.LessonsCommand
+import com.turki.bot.handler.command.lesson.PracticeCommand
+import com.turki.bot.handler.command.lesson.VocabularyCommand
+import com.turki.bot.handler.command.menu.HelpCommand
+import com.turki.bot.handler.command.menu.MenuCommand
+import com.turki.bot.handler.command.menu.ProgressCommand
+import com.turki.bot.handler.command.reminder.RemindersCommand
+import com.turki.bot.handler.command.review.ReviewCommand
+import com.turki.bot.handler.command.system.DeleteCommand
+import com.turki.bot.handler.command.system.ExportCommand
+import com.turki.bot.handler.command.system.ResetCommand
+import com.turki.bot.handler.command.system.StartCommand
+import com.turki.bot.handler.command.system.SupportCommand
+import com.turki.bot.handler.homework.HomeworkTextAction
+import com.turki.bot.handler.homework.HomeworkTextAnswerAction
 import com.turki.bot.service.HomeworkService
 import com.turki.bot.service.LessonService
 import com.turki.bot.service.AnalyticsService
@@ -88,6 +112,31 @@ val botModule = module {
     single { UserDataService(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     single { SupportService() }
     single { MetricsService(get(), get(), get(), get()) }
+
+    single<CommandAction> { StartCommand(get(), get(), get()) }
+    single<CommandAction> { LessonCommand(get(), get(), get()) }
+    single<CommandAction> { HomeworkCommand(get(), get()) }
+    single<CommandAction> { ProgressCommand(get(), get(), get()) }
+    single<CommandAction> { HelpCommand(get(), get()) }
+    single<CommandAction> { VocabularyCommand(get(), get(), get()) }
+    single<CommandAction> { MenuCommand(get(), get(), get()) }
+    single<CommandAction> { LessonsCommand(get(), get(), get(), get()) }
+    single<CommandAction> { PracticeCommand(get(), get()) }
+    single<CommandAction> { DictionaryCommand(get(), get(), get()) }
+    single<CommandAction> { ReviewCommand(get(), get()) }
+    single<CommandAction> { RemindersCommand(get(), get(), get()) }
+    single<CommandAction> { ResetCommand(get(), get()) }
+    single<CommandAction> { DeleteCommand(get(), get()) }
+    single<CommandAction> { ExportCommand(get(), get(), get()) }
+    single<CommandAction> { SupportCommand(get(), get(), get()) }
+
+    single<CommandTextAction> { DictionaryQueryTextAction(get(), get(), get()) }
+    single<CommandTextAction> { DictionaryCustomTextAction(get(), get(), get()) }
+
+    single { CommandHandler(getAll<CommandAction>(), getAll<CommandTextAction>()) }
+
+    single<HomeworkTextAction> { HomeworkTextAnswerAction(get(), get(), get(), get(), get(), get()) }
+    single { HomeworkHandler(getAll<HomeworkTextAction>()) }
 
     single<CallbackAction> { LessonAction(get()) }
     single<CallbackAction> { LessonsListAction(get(), get(), get(), get()) }
