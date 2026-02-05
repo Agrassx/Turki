@@ -8,6 +8,7 @@ import kotlinx.datetime.Instant
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.insertAndGetId
 import org.jetbrains.exposed.sql.selectAll
 
@@ -123,16 +124,14 @@ class MetricsRepositoryImpl : MetricsRepository {
         }
 
     override suspend fun getTopEventsSince(since: Instant, limit: Int): Map<String, Long> = DatabaseFactory.dbQuery {
-        AnalyticsEventsTable.selectAll()
+        val countCol = AnalyticsEventsTable.id.count()
+        AnalyticsEventsTable
+            .select(AnalyticsEventsTable.eventName, countCol)
             .where { AnalyticsEventsTable.createdAt greaterEq since }
             .groupBy(AnalyticsEventsTable.eventName)
-            .associate {
-                it[AnalyticsEventsTable.eventName] to it.fieldIndex.size.toLong()
-            }
-            .toList()
-            .sortedByDescending { it.second }
-            .take(limit)
-            .toMap()
+            .orderBy(countCol, SortOrder.DESC)
+            .limit(limit)
+            .associate { it[AnalyticsEventsTable.eventName] to it[countCol] }
     }
 
     private fun toMetricSnapshot(row: ResultRow) = MetricSnapshot(
