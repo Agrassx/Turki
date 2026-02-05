@@ -15,7 +15,9 @@ import org.jetbrains.exposed.sql.insertAndGetId
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 
-class SubscriptionRepositoryImpl : SubscriptionRepository {
+class SubscriptionRepositoryImpl(
+    private val clock: Clock = Clock.System
+) : SubscriptionRepository {
 
     // Subscription Plans
     override suspend fun findAllPlans(activeOnly: Boolean): List<SubscriptionPlan> =
@@ -44,7 +46,7 @@ class SubscriptionRepositoryImpl : SubscriptionRepository {
 
     override suspend fun createPlan(plan: SubscriptionPlan): SubscriptionPlan =
         DatabaseFactory.dbQuery {
-            val now = Clock.System.now()
+            val now = clock.now()
             val id = SubscriptionPlansTable.insertAndGetId {
                 it[code] = plan.code
                 it[name] = plan.name
@@ -68,7 +70,7 @@ class SubscriptionRepositoryImpl : SubscriptionRepository {
 
     override suspend fun updatePlan(plan: SubscriptionPlan): SubscriptionPlan =
         DatabaseFactory.dbQuery {
-            val now = Clock.System.now()
+            val now = clock.now()
             SubscriptionPlansTable.update({ SubscriptionPlansTable.id eq plan.id }) {
                 it[name] = plan.name
                 it[description] = plan.description
@@ -111,7 +113,7 @@ class SubscriptionRepositoryImpl : SubscriptionRepository {
 
     override suspend fun createSubscription(subscription: UserSubscription): UserSubscription =
         DatabaseFactory.dbQuery {
-            val now = Clock.System.now()
+            val now = clock.now()
             val id = UserSubscriptionsTable.insertAndGetId {
                 it[userId] = subscription.userId
                 it[planId] = subscription.planId
@@ -131,7 +133,7 @@ class SubscriptionRepositoryImpl : SubscriptionRepository {
 
     override suspend fun updateSubscription(subscription: UserSubscription): UserSubscription =
         DatabaseFactory.dbQuery {
-            val now = Clock.System.now()
+            val now = clock.now()
             UserSubscriptionsTable.update({ UserSubscriptionsTable.id eq subscription.id }) {
                 it[status] = subscription.status.name
                 it[expiresAt] = subscription.expiresAt
@@ -147,7 +149,7 @@ class SubscriptionRepositoryImpl : SubscriptionRepository {
 
     override suspend fun cancelSubscription(subscriptionId: Long): Boolean =
         DatabaseFactory.dbQuery {
-            val now = Clock.System.now()
+            val now = clock.now()
             UserSubscriptionsTable.update({ UserSubscriptionsTable.id eq subscriptionId }) {
                 it[status] = SubscriptionStatus.CANCELLED.name
                 it[cancelledAt] = now
@@ -175,7 +177,7 @@ class SubscriptionRepositoryImpl : SubscriptionRepository {
 
     override suspend fun createTransaction(transaction: PaymentTransaction): PaymentTransaction =
         DatabaseFactory.dbQuery {
-            val now = Clock.System.now()
+            val now = clock.now()
             val id = PaymentTransactionsTable.insertAndGetId {
                 it[userId] = transaction.userId
                 it[subscriptionId] = transaction.subscriptionId

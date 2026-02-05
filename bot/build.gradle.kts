@@ -17,6 +17,10 @@ dependencies {
     implementation(libs.koin.ktor)
     implementation(libs.logback.classic)
     implementation(libs.quartz)
+    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.kotlin.test.junit5)
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
 
 tasks.jar {
@@ -26,4 +30,8 @@ tasks.jar {
     }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from(configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) })
+}
+
+tasks.test {
+    useJUnitPlatform()
 }

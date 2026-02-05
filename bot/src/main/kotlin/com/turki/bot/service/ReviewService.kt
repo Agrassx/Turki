@@ -17,7 +17,10 @@ class ReviewService(
     private val lessonService: LessonService,
     private val reviewRepository: ReviewRepository,
     private val userDictionaryRepository: UserDictionaryRepository,
-    private val homeworkRepository: HomeworkRepository
+    private val homeworkRepository: HomeworkRepository,
+    private val clock: Clock = Clock.System,
+    private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
+    private val random: Random = Random.Default
 ) {
     companion object {
         private const val MAX_STAGE = 6
@@ -62,20 +65,20 @@ class ReviewService(
 
         // Generate questions from user dictionary (priority)
         userDictionary.take(questionCount / 3).forEach { vocab ->
-            val direction = if (Random.nextBoolean()) TranslationDirection.RU_TO_TR else TranslationDirection.TR_TO_RU
+            val direction = if (random.nextBoolean()) TranslationDirection.RU_TO_TR else TranslationDirection.TR_TO_RU
             questions.add(createVocabularyQuestion(vocab, direction, allVocabulary, ReviewSourceType.USER_DICTIONARY))
         }
 
         // Generate questions from lesson vocabulary
         val vocabNeeded = (questionCount * 2 / 3) - questions.size
-        lessonVocabulary.shuffled().take(vocabNeeded).forEach { vocab ->
-            val direction = if (Random.nextBoolean()) TranslationDirection.RU_TO_TR else TranslationDirection.TR_TO_RU
+        lessonVocabulary.shuffled(random).take(vocabNeeded).forEach { vocab ->
+            val direction = if (random.nextBoolean()) TranslationDirection.RU_TO_TR else TranslationDirection.TR_TO_RU
             questions.add(createVocabularyQuestion(vocab, direction, allVocabulary, ReviewSourceType.VOCABULARY))
         }
 
         // Add homework questions if we need more
         val homeworkNeeded = questionCount - questions.size
-        homeworkQuestions.shuffled().take(homeworkNeeded).forEach { hw ->
+        homeworkQuestions.shuffled(random).take(homeworkNeeded).forEach { hw ->
             questions.add(
                 ReviewQuestion(
                     id = "hw_${hw.id}",
@@ -99,16 +102,16 @@ class ReviewService(
             }.toSet()
 
             allVocabulary.filterNot { it.id in usedIds }
-                .shuffled()
+                .shuffled(random)
                 .take(remaining)
                 .forEach { vocab ->
-                    val direction = if (Random.nextBoolean()) TranslationDirection.RU_TO_TR else TranslationDirection.TR_TO_RU
+                    val direction = if (random.nextBoolean()) TranslationDirection.RU_TO_TR else TranslationDirection.TR_TO_RU
                     questions.add(createVocabularyQuestion(vocab, direction, allVocabulary, ReviewSourceType.VOCABULARY))
                 }
         }
 
         return ReviewSessionPayload(
-            questions = questions.shuffled().take(questionCount),
+            questions = questions.shuffled(random).take(questionCount),
             currentIndex = 0,
             correctCount = 0,
             difficulty = difficulty
@@ -129,11 +132,11 @@ class ReviewService(
         // Generate wrong options from other vocabulary
         val wrongOptions = allVocabulary
             .filter { it.id != vocab.id }
-            .shuffled()
+            .shuffled(random)
             .take(OPTIONS_COUNT - 1)
             .map { if (direction == TranslationDirection.RU_TO_TR) it.word else it.translation }
 
-        val options = (wrongOptions + correctAnswer).shuffled()
+        val options = (wrongOptions + correctAnswer).shuffled(random)
 
         return ReviewQuestion(
             id = "vocab_${vocab.id}_${direction.name}",
@@ -148,7 +151,7 @@ class ReviewService(
 
     // Legacy method for old review flow (kept for compatibility)
     suspend fun buildQueue(userId: Long, limit: Int, currentLessonId: Int): List<VocabularyItem> {
-        val now = Clock.System.now()
+        val now = clock.now()
         val due = reviewRepository.getDueCards(userId, now, limit).mapNotNull { card ->
             lessonService.findVocabularyById(card.vocabularyId)
         }.toMutableList()
@@ -181,7 +184,7 @@ class ReviewService(
             correct -> (existing.stage + 1).coerceAtMost(MAX_STAGE)
             else -> (existing.stage - 1).coerceAtLeast(0)
         }
-        val nextReviewAt = nextReviewTime(stage, Clock.System.now())
+        val nextReviewAt = nextReviewTime(stage, clock.now())
         reviewRepository.upsert(
             ReviewCard(
                 userId = userId,
@@ -203,7 +206,7 @@ class ReviewService(
             5 -> STAGE_5_DAYS
             else -> STAGE_FINAL_DAYS
         }
-        return now.plus(DateTimePeriod(days = days), TimeZone.currentSystemDefault())
+        return now.plus(DateTimePeriod(days = days), timeZone)
     }
 
     suspend fun clearUser(userId: Long) {

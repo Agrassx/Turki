@@ -9,7 +9,9 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 
-class UserStateRepositoryImpl : UserStateRepository {
+class UserStateRepositoryImpl(
+    private val clock: Clock = Clock.System
+) : UserStateRepository {
     override suspend fun findByUserId(userId: Long): UserState? = DatabaseFactory.dbQuery {
         UserStatesTable.selectAll()
             .where { UserStatesTable.userId eq userId }
@@ -18,7 +20,7 @@ class UserStateRepositoryImpl : UserStateRepository {
     }
 
     override suspend fun upsert(userId: Long, state: String, payload: String): UserState = DatabaseFactory.dbQuery {
-        val now = Clock.System.now()
+        val now = clock.now()
         val updated = UserStatesTable.update({ UserStatesTable.userId eq userId }) {
             it[UserStatesTable.state] = state
             it[UserStatesTable.payload] = payload

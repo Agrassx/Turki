@@ -29,7 +29,11 @@ private val reminderPreferenceService: ReminderPreferenceService by inject(Remin
 private val progressService: ProgressService by inject(ProgressService::class.java)
 private val analyticsService: AnalyticsService by inject(AnalyticsService::class.java)
 
-suspend fun startReminderScheduler(bot: TelegramBot) {
+suspend fun startReminderScheduler(
+    bot: TelegramBot,
+    clock: Clock = Clock.System,
+    timeZone: TimeZone = TimeZone.currentSystemDefault()
+) {
     while (true) {
         try {
             val pendingReminders = reminderService.getPendingReminders()
@@ -55,8 +59,8 @@ suspend fun startReminderScheduler(bot: TelegramBot) {
                 }
             }
 
-            sendScheduledReminders(bot)
-            sendWeeklyReports(bot)
+            sendScheduledReminders(bot, clock, timeZone)
+            sendWeeklyReports(bot, clock, timeZone)
         } catch (e: Exception) {
             logger.error("Error in reminder scheduler: ${e.message}")
         }
@@ -65,10 +69,14 @@ suspend fun startReminderScheduler(bot: TelegramBot) {
     }
 }
 
-private suspend fun sendScheduledReminders(bot: TelegramBot) {
+private suspend fun sendScheduledReminders(
+    bot: TelegramBot,
+    clock: Clock,
+    timeZone: TimeZone
+) {
     val users = userService.getAllUsers()
-    val now = Clock.System.now()
-    val local = now.toLocalDateTime(TimeZone.currentSystemDefault())
+    val now = clock.now()
+    val local = now.toLocalDateTime(timeZone)
     val currentDay = local.date.dayOfWeek
     val currentTime = "%02d:%02d".format(local.hour, local.minute)
 
@@ -83,7 +91,7 @@ private suspend fun sendScheduledReminders(bot: TelegramBot) {
         if (pref.timeLocal != currentTime) {
             return@forEach
         }
-        val lastFired = pref.lastFiredAt?.toLocalDateTime(TimeZone.currentSystemDefault())?.date
+        val lastFired = pref.lastFiredAt?.toLocalDateTime(timeZone)?.date
         if (lastFired == local.date) {
             return@forEach
         }
@@ -98,18 +106,21 @@ private suspend fun sendScheduledReminders(bot: TelegramBot) {
     }
 }
 
-private suspend fun sendWeeklyReports(bot: TelegramBot) {
+private suspend fun sendWeeklyReports(
+    bot: TelegramBot,
+    clock: Clock,
+    timeZone: TimeZone
+) {
     val users = userService.getAllUsers()
-    val now = Clock.System.now()
-    val zone = TimeZone.currentSystemDefault()
-    val local = now.toLocalDateTime(zone)
+    val now = clock.now()
+    val local = now.toLocalDateTime(timeZone)
     if (local.date.dayOfWeek != DayOfWeek.SUNDAY) {
         return
     }
 
     users.forEach { user ->
         val stats = progressService.getWeeklyStats(user.id)
-        val lastReportDate = stats.lastWeeklyReportAt?.toLocalDateTime(zone)?.date
+        val lastReportDate = stats.lastWeeklyReportAt?.toLocalDateTime(timeZone)?.date
         if (lastReportDate == local.date) {
             return@forEach
         }

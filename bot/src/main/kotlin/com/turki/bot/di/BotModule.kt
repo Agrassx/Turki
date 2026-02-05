@@ -14,21 +14,25 @@ import com.turki.bot.service.SupportService
 import com.turki.bot.service.UserDataService
 import com.turki.bot.service.UserService
 import com.turki.bot.service.UserStateService
+import kotlinx.datetime.TimeZone
+import kotlin.random.Random
 import org.koin.dsl.module
 
 val botModule = module {
-    single { UserService(get()) }
+    single { TimeZone.currentSystemDefault() }
+    single<Random> { Random.Default }
+    single { UserService(get(), get()) }
     single { LessonService(get()) }
-    single { HomeworkService(get(), get()) }
-    single { ReminderService(get()) }
+    single { HomeworkService(get(), get(), get()) }
+    single { ReminderService(get(), get()) }
     single { UserStateService(get()) }
-    single { ExerciseService(get()) }
-    single { ProgressService(get(), get(), get()) }
-    single { DictionaryService(get(), get(), get()) }
-    single { ReviewService(get(), get(), get(), get()) }
-    single { ReminderPreferenceService(get()) }
-    single { AnalyticsService(get()) }
-    single { UserDataService(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    single { ExerciseService(get(), get()) }
+    single { ProgressService(get(), get(), get(), get(), get()) }
+    single { DictionaryService(get(), get(), get(), get()) }
+    single { ReviewService(get(), get(), get(), get(), get(), get(), get()) }
+    single { ReminderPreferenceService(get(), get()) }
+    single { AnalyticsService(get(), get()) }
+    single { UserDataService(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     single { SupportService() }
-    single { MetricsService(get(), get(), get()) }
+    single { MetricsService(get(), get(), get(), get()) }
 }

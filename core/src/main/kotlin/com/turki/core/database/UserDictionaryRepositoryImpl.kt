@@ -10,7 +10,9 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 
-class UserDictionaryRepositoryImpl : UserDictionaryRepository {
+class UserDictionaryRepositoryImpl(
+    private val clock: Clock = Clock.System
+) : UserDictionaryRepository {
     override suspend fun findByUserAndVocabulary(userId: Long, vocabularyId: Int): UserDictionaryEntry? =
         DatabaseFactory.dbQuery {
             UserDictionaryTable.selectAll()
@@ -29,7 +31,7 @@ class UserDictionaryRepositoryImpl : UserDictionaryRepository {
     }
 
     override suspend fun upsert(entry: UserDictionaryEntry): UserDictionaryEntry = DatabaseFactory.dbQuery {
-        val now = Clock.System.now()
+        val now = clock.now()
         val updated = UserDictionaryTable.update({
             (UserDictionaryTable.userId eq entry.userId) and
                 (UserDictionaryTable.vocabularyId eq entry.vocabularyId)

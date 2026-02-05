@@ -14,7 +14,9 @@ import kotlinx.datetime.minus
 class ProgressService(
     private val userProgressRepository: UserProgressRepository,
     private val userStatsRepository: UserStatsRepository,
-    private val lessonService: LessonService
+    private val lessonService: LessonService,
+    private val clock: Clock = Clock.System,
+    private val timeZone: TimeZone = TimeZone.currentSystemDefault()
 ) {
     suspend fun markLessonStarted(userId: Long, lessonId: Int, contentVersion: String = "v1") {
         userProgressRepository.upsert(
@@ -24,7 +26,7 @@ class ProgressService(
                 status = "IN_PROGRESS",
                 lastExerciseId = null,
                 contentVersion = contentVersion,
-                updatedAt = Clock.System.now()
+                updatedAt = clock.now()
             )
         )
         touchStats(userId) { it }
@@ -38,7 +40,7 @@ class ProgressService(
                 status = "COMPLETED",
                 lastExerciseId = null,
                 contentVersion = contentVersion,
-                updatedAt = Clock.System.now()
+                updatedAt = clock.now()
             )
         )
         touchStats(userId) { stats ->
@@ -111,7 +113,7 @@ class ProgressService(
     }
 
     private suspend fun touchStats(userId: Long, update: (UserStats) -> UserStats) {
-        val now = Clock.System.now()
+        val now = clock.now()
         val existing = userStatsRepository.findByUserId(userId)
         val base = existing ?: UserStats(
             userId = userId,
@@ -139,9 +141,8 @@ class ProgressService(
         if (lastActiveAt == null) {
             return 1
         }
-        val zone = TimeZone.currentSystemDefault()
-        val lastDate = lastActiveAt.toLocalDateTime(zone).date
-        val today = now.toLocalDateTime(zone).date
+        val lastDate = lastActiveAt.toLocalDateTime(timeZone).date
+        val today = now.toLocalDateTime(timeZone).date
         return when {
             lastDate == today -> current
             lastDate == today.minus(1, DateTimeUnit.DAY) -> current + 1

@@ -19,7 +19,11 @@ private const val ERROR_RETRY_DELAY_MS = 300_000L
  * Scheduler for sending daily reports.
  * Reports are sent at 09:00 Moscow time (UTC+3).
  */
-suspend fun startDailyReportScheduler(bot: TelegramBot) {
+suspend fun startDailyReportScheduler(
+    bot: TelegramBot,
+    clock: Clock = Clock.System,
+    reportTimeZone: TimeZone = TimeZone.of("Europe/Moscow")
+) {
     if (!metricsService.isConfigured()) {
         logger.info("STATS_CHAT_ID not configured, daily reports disabled")
         return
@@ -29,9 +33,8 @@ suspend fun startDailyReportScheduler(bot: TelegramBot) {
 
     while (true) {
         try {
-            val now = Clock.System.now()
-            val msk = TimeZone.of("Europe/Moscow")
-            val localNow = now.toLocalDateTime(msk)
+            val now = clock.now()
+            val localNow = now.toLocalDateTime(reportTimeZone)
 
             // Calculate delay until next 9:00 MSK
             val targetHour = 9

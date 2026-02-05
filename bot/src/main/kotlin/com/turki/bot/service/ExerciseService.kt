@@ -12,7 +12,8 @@ data class ExerciseItem(
 )
 
 class ExerciseService(
-    private val lessonService: LessonService
+    private val lessonService: LessonService,
+    private val random: Random = Random.Default
 ) {
     suspend fun buildLessonExercises(lessonId: Int, limit: Int = 3): List<ExerciseItem> {
         val vocabulary = lessonService.getVocabulary(lessonId)
@@ -20,7 +21,7 @@ class ExerciseService(
             return emptyList()
         }
 
-        val target = vocabulary.shuffled().take(limit)
+        val target = vocabulary.shuffled(random).take(limit)
         return target.map { item ->
             val options = buildOptions(item, vocabulary)
             ExerciseItem(
@@ -38,7 +39,7 @@ class ExerciseService(
             .filter { it.id != item.id }
             .map { it.translation }
             .distinct()
-            .shuffled()
+            .shuffled(random)
             .take(3)
         return (distractors + item.translation).shuffled(Random(item.id))
     }

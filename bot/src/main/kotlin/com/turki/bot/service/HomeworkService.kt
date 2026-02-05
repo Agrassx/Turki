@@ -22,7 +22,8 @@ import kotlinx.datetime.Clock
  */
 class HomeworkService(
     private val homeworkRepository: HomeworkRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val clock: Clock = Clock.System
 ) {
 
     /**
@@ -91,7 +92,7 @@ class HomeworkService(
             answers = answers,
             score = score,
             maxScore = questions.size,
-            submittedAt = Clock.System.now()
+            submittedAt = clock.now()
         )
 
         val savedSubmission = homeworkRepository.createSubmission(submission)

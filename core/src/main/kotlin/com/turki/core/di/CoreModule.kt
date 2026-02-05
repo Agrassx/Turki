@@ -29,22 +29,24 @@ import com.turki.core.repository.UserStateRepository
 import com.turki.core.repository.UserStatsRepository
 import com.turki.core.repository.ReviewRepository
 import com.turki.core.service.DataImportService
+import kotlinx.datetime.Clock
 import org.koin.dsl.module
 
 val coreModule = module {
-    single<UserRepository> { UserRepositoryImpl() }
+    single<Clock> { Clock.System }
+    single<UserRepository> { UserRepositoryImpl(get()) }
     single<LessonRepository> { LessonRepositoryImpl() }
     single<HomeworkRepository> { HomeworkRepositoryImpl() }
     single<ReminderRepository> { ReminderRepositoryImpl() }
-    single<UserStateRepository> { UserStateRepositoryImpl() }
-    single<UserProgressRepository> { UserProgressRepositoryImpl() }
-    single<UserDictionaryRepository> { UserDictionaryRepositoryImpl() }
+    single<UserStateRepository> { UserStateRepositoryImpl(get()) }
+    single<UserProgressRepository> { UserProgressRepositoryImpl(get()) }
+    single<UserDictionaryRepository> { UserDictionaryRepositoryImpl(get()) }
     single<UserCustomDictionaryRepository> { UserCustomDictionaryRepositoryImpl() }
     single<ReviewRepository> { ReviewRepositoryImpl() }
-    single<ReminderPreferenceRepository> { ReminderPreferenceRepositoryImpl() }
+    single<ReminderPreferenceRepository> { ReminderPreferenceRepositoryImpl(get()) }
     single<AnalyticsRepository> { AnalyticsRepositoryImpl() }
-    single<UserStatsRepository> { UserStatsRepositoryImpl() }
-    single<SubscriptionRepository> { SubscriptionRepositoryImpl() }
-    single<MetricsRepository> { MetricsRepositoryImpl() }
+    single<UserStatsRepository> { UserStatsRepositoryImpl(get()) }
+    single<SubscriptionRepository> { SubscriptionRepositoryImpl(get()) }
+    single<MetricsRepository> { MetricsRepositoryImpl(get()) }
     single { DataImportService() }
 }

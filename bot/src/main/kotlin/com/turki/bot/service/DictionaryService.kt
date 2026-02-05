@@ -12,7 +12,8 @@ import kotlinx.serialization.json.Json
 class DictionaryService(
     private val lessonService: LessonService,
     private val userDictionaryRepository: UserDictionaryRepository,
-    private val userCustomDictionaryRepository: UserCustomDictionaryRepository
+    private val userCustomDictionaryRepository: UserCustomDictionaryRepository,
+    private val clock: Clock = Clock.System
 ) {
     private val json = Json { encodeDefaults = true }
 
@@ -26,7 +27,7 @@ class DictionaryService(
             vocabularyId = vocabularyId,
             isFavorite = existing?.isFavorite?.not() ?: true,
             tags = existing?.tags ?: json.encodeToString(emptyList<String>()),
-            addedAt = Clock.System.now()
+            addedAt = clock.now()
         )
         return userDictionaryRepository.upsert(next)
     }
@@ -38,7 +39,7 @@ class DictionaryService(
             vocabularyId = vocabularyId,
             isFavorite = true,
             tags = existing?.tags ?: json.encodeToString(emptyList<String>()),
-            addedAt = existing?.addedAt ?: Clock.System.now()
+            addedAt = existing?.addedAt ?: clock.now()
         )
         return userDictionaryRepository.upsert(next)
     }
@@ -50,7 +51,7 @@ class DictionaryService(
             vocabularyId = vocabularyId,
             isFavorite = false,
             tags = existing?.tags ?: json.encodeToString(emptyList<String>()),
-            addedAt = existing?.addedAt ?: Clock.System.now()
+            addedAt = existing?.addedAt ?: clock.now()
         )
         return userDictionaryRepository.upsert(next)
     }
@@ -87,7 +88,7 @@ class DictionaryService(
             translation = translation,
             pronunciation = pronunciation,
             example = example,
-            addedAt = Clock.System.now()
+            addedAt = clock.now()
         )
         return userCustomDictionaryRepository.create(entry)
     }
@@ -126,7 +127,7 @@ class DictionaryService(
             vocabularyId = vocabularyId,
             isFavorite = existing?.isFavorite ?: true,
             tags = json.encodeToString(tags),
-            addedAt = existing?.addedAt ?: Clock.System.now()
+            addedAt = existing?.addedAt ?: clock.now()
         )
         return userDictionaryRepository.upsert(next)
     }

@@ -14,7 +14,9 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 
-class UserRepositoryImpl : UserRepository {
+class UserRepositoryImpl(
+    private val clock: Clock = Clock.System
+) : UserRepository {
 
     override suspend fun findById(id: Long): User? = DatabaseFactory.dbQuery {
         UsersTable.selectAll().where { UsersTable.id eq id }
@@ -38,7 +40,7 @@ class UserRepositoryImpl : UserRepository {
     }
 
     override suspend fun create(user: User): User = DatabaseFactory.dbQuery {
-        val now = Clock.System.now()
+        val now = clock.now()
         val id = UsersTable.insert {
             it[telegramId] = user.telegramId
             it[username] = user.username
@@ -56,7 +58,7 @@ class UserRepositoryImpl : UserRepository {
     }
 
     override suspend fun update(user: User): User = DatabaseFactory.dbQuery {
-        val now = Clock.System.now()
+        val now = clock.now()
         UsersTable.update({ UsersTable.id eq user.id }) {
             it[username] = user.username
             it[firstName] = user.firstName
@@ -78,21 +80,21 @@ class UserRepositoryImpl : UserRepository {
         UsersTable.update({ UsersTable.id eq userId }) {
             it[subscriptionActive] = active
             it[subscriptionExpiresAt] = expiresAt
-            it[updatedAt] = Clock.System.now()
+            it[updatedAt] = clock.now()
         } > 0
     }
 
     override suspend fun updateCurrentLesson(userId: Long, lessonId: Int): Boolean = DatabaseFactory.dbQuery {
         UsersTable.update({ UsersTable.id eq userId }) {
             it[currentLessonId] = lessonId
-            it[updatedAt] = Clock.System.now()
+            it[updatedAt] = clock.now()
         } > 0
     }
 
     override suspend fun updateLanguage(userId: Long, language: Language): Boolean = DatabaseFactory.dbQuery {
         UsersTable.update({ UsersTable.id eq userId }) {
             it[UsersTable.language] = language.code
-            it[updatedAt] = Clock.System.now()
+            it[updatedAt] = clock.now()
         } > 0
     }
 
@@ -108,13 +110,13 @@ class UserRepositoryImpl : UserRepository {
         HomeworkSubmissionsTable.deleteWhere { HomeworkSubmissionsTable.userId eq userId }
         UsersTable.update({ UsersTable.id eq userId }) {
             it[currentLessonId] = 1
-            it[updatedAt] = Clock.System.now()
+            it[updatedAt] = clock.now()
         } > 0
     }
 
     override suspend fun resetAllProgress(): Boolean = DatabaseFactory.dbQuery {
         HomeworkSubmissionsTable.deleteWhere { Op.TRUE }
-        val now = Clock.System.now()
+        val now = clock.now()
         UsersTable.update({ Op.TRUE }) {
             it[currentLessonId] = 1
             it[updatedAt] = now

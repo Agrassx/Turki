@@ -31,7 +31,8 @@ import org.slf4j.LoggerFactory
 class MetricsService(
     private val metricsRepository: MetricsRepository,
     private val analyticsRepository: AnalyticsRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val clock: Clock = Clock.System
 ) {
     private val logger = LoggerFactory.getLogger("MetricsService")
     private val statsChatId: Long? = EnvLoader.get("STATS_CHAT_ID")?.toLongOrNull()
@@ -55,7 +56,7 @@ class MetricsService(
                     stackTrace = stackTrace,
                     userId = userId,
                     context = context?.let { json.encodeToString(it) },
-                    createdAt = Clock.System.now()
+                    createdAt = clock.now()
                 )
             )
         } catch (e: Exception) {
@@ -67,7 +68,7 @@ class MetricsService(
      * Generate daily report with all metrics.
      */
     suspend fun generateDailyReport(): DailyReport {
-        val now = Clock.System.now()
+        val now = clock.now()
         val tz = TimeZone.UTC
         val today = now.toLocalDateTime(tz).date.toString()
 
@@ -150,7 +151,7 @@ class MetricsService(
      * Save daily metrics snapshot.
      */
     suspend fun saveDailySnapshot(report: DailyReport) {
-        val now = Clock.System.now()
+        val now = clock.now()
         val date = report.date
 
         fun snapshot(name: String, value: Long) =
@@ -212,7 +213,7 @@ class MetricsService(
 <b>Тип:</b> <code>$errorType</code>
 <b>Сообщение:</b> $message
 ${userId?.let { "<b>User ID:</b> <code>$it</code>" } ?: ""}
-<b>Время:</b> ${Clock.System.now()}
+<b>Время:</b> ${clock.now()}
             """.trimIndent()
 
             bot.sendMessage(
@@ -264,7 +265,7 @@ ${if (report.errorsToday > 0) "⚠️ <b>Ошибок за день:</b> ${repor
 
     private suspend fun calculateRetentionD1(): Double {
         // Simplified: check how many users who registered 1-2 days ago returned today
-        val now = Clock.System.now()
+        val now = clock.now()
         val tz = TimeZone.UTC
         val oneDayAgo = now.minus(1, DateTimeUnit.DAY, tz)
         val twoDaysAgo = now.minus(2, DateTimeUnit.DAY, tz)

@@ -17,7 +17,10 @@ import kotlinx.datetime.Instant
  *
  * All operations are coroutine-based and thread-safe.
  */
-class UserService(private val userRepository: UserRepository) {
+class UserService(
+    private val userRepository: UserRepository,
+    private val clock: Clock = Clock.System
+) {
 
     /**
      * Finds an existing user by Telegram ID or creates a new one.
@@ -58,7 +61,7 @@ class UserService(private val userRepository: UserRepository) {
         firstName: String,
         lastName: String?
     ): User {
-        val now = Clock.System.now()
+        val now = clock.now()
         val user = User(
             id = 0,
             telegramId = telegramId,

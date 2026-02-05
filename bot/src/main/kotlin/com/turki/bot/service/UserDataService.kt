@@ -13,6 +13,7 @@ import com.turki.core.repository.UserProgressRepository
 import com.turki.core.repository.UserRepository
 import com.turki.core.repository.UserStateRepository
 import com.turki.core.repository.UserStatsRepository
+import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -101,7 +102,8 @@ class UserDataService(
     private val homeworkRepository: HomeworkRepository,
     private val analyticsRepository: AnalyticsRepository,
     private val userStatsRepository: UserStatsRepository,
-    private val lessonRepository: LessonRepository
+    private val lessonRepository: LessonRepository,
+    private val clock: Clock = Clock.System
 ) {
     private val json = Json { prettyPrint = true }
 
@@ -122,7 +124,7 @@ class UserDataService(
         val stats = userStatsRepository.findByUserId(user.id)
 
         val export = UserDataExport(
-            exportDate = kotlinx.datetime.Clock.System.now().toString(),
+            exportDate = clock.now().toString(),
             profile = ProfileExport(
                 telegramId = user.telegramId,
                 username = user.username,

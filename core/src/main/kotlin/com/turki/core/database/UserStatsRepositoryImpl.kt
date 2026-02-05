@@ -9,7 +9,9 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 
-class UserStatsRepositoryImpl : UserStatsRepository {
+class UserStatsRepositoryImpl(
+    private val clock: Clock = Clock.System
+) : UserStatsRepository {
     override suspend fun findByUserId(userId: Long): UserStats? = DatabaseFactory.dbQuery {
         UserStatsTable.selectAll()
             .where { UserStatsTable.userId eq userId }
@@ -50,7 +52,7 @@ class UserStatsRepositoryImpl : UserStatsRepository {
             it[weeklyPractice] = 0
             it[weeklyReview] = 0
             it[weeklyHomework] = 0
-            it[lastWeeklyReportAt] = Clock.System.now()
+            it[lastWeeklyReportAt] = clock.now()
         } > 0
     }
 

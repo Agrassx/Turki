@@ -9,7 +9,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 class AnalyticsService(
-    private val analyticsRepository: AnalyticsRepository
+    private val analyticsRepository: AnalyticsRepository,
+    private val clock: Clock = Clock.System
 ) {
     private val json = Json { encodeDefaults = true }
 
@@ -26,7 +27,7 @@ class AnalyticsService(
                 userId = userId,
                 sessionId = sessionId,
                 props = json.encodeToString(payload),
-                createdAt = Clock.System.now()
+                createdAt = clock.now()
             )
         )
     }

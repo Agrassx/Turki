@@ -10,7 +10,9 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 
-class UserProgressRepositoryImpl : UserProgressRepository {
+class UserProgressRepositoryImpl(
+    private val clock: Clock = Clock.System
+) : UserProgressRepository {
     override suspend fun findByUserAndLesson(userId: Long, lessonId: Int): UserProgress? = DatabaseFactory.dbQuery {
         UserProgressTable.selectAll()
             .where { (UserProgressTable.userId eq userId) and (UserProgressTable.lessonId eq lessonId) }
@@ -25,7 +27,7 @@ class UserProgressRepositoryImpl : UserProgressRepository {
     }
 
     override suspend fun upsert(progress: UserProgress): UserProgress = DatabaseFactory.dbQuery {
-        val now = Clock.System.now()
+        val now = clock.now()
         val updated = UserProgressTable.update({
             (UserProgressTable.userId eq progress.userId) and (UserProgressTable.lessonId eq progress.lessonId)
         }) {

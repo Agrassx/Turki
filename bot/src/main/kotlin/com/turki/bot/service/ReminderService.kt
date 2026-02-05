@@ -18,7 +18,10 @@ import kotlin.time.Duration.Companion.hours
  * Reminders are scheduled at specific times and processed by the ReminderScheduler.
  * All operations are coroutine-based and thread-safe.
  */
-class ReminderService(private val reminderRepository: ReminderRepository) {
+class ReminderService(
+    private val reminderRepository: ReminderRepository,
+    private val clock: Clock = Clock.System
+) {
 
     /**
      * Creates a lesson reminder for a user at a specific time.
@@ -44,7 +47,7 @@ class ReminderService(private val reminderRepository: ReminderRepository) {
      * @return The created [Reminder] scheduled for 24 hours later
      */
     suspend fun createHomeworkReminder(userId: Long): Reminder {
-        val scheduledAt = Clock.System.now() + 24.hours
+        val scheduledAt = clock.now() + 24.hours
         val reminder = Reminder(
             id = 0,
             userId = userId,
@@ -60,7 +63,7 @@ class ReminderService(private val reminderRepository: ReminderRepository) {
      * @return List of [Reminder] objects that should be sent now
      */
     suspend fun getPendingReminders(): List<Reminder> {
-        val now = Clock.System.now()
+        val now = clock.now()
         return reminderRepository.findPendingReminders(now)
     }
 
@@ -70,7 +73,7 @@ class ReminderService(private val reminderRepository: ReminderRepository) {
      * @param reminderId The reminder's database ID
      */
     suspend fun markReminderAsSent(reminderId: Long) {
-        reminderRepository.markAsSent(reminderId, Clock.System.now())
+        reminderRepository.markAsSent(reminderId, clock.now())
     }
 
     /**

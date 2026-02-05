@@ -12,11 +12,13 @@ import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.insertAndGetId
 import org.jetbrains.exposed.sql.selectAll
 
-class MetricsRepositoryImpl : MetricsRepository {
+class MetricsRepositoryImpl(
+    private val clock: Clock = Clock.System
+) : MetricsRepository {
 
     // Metric snapshots
     override suspend fun saveSnapshot(snapshot: MetricSnapshot): MetricSnapshot = DatabaseFactory.dbQuery {
-        val now = Clock.System.now()
+        val now = clock.now()
         val id = MetricsSnapshotsTable.insertAndGetId {
             it[date] = snapshot.date
             it[metricName] = snapshot.metricName
@@ -59,7 +61,7 @@ class MetricsRepositoryImpl : MetricsRepository {
 
     // Error logs
     override suspend fun logError(error: ErrorLog): ErrorLog = DatabaseFactory.dbQuery {
-        val now = Clock.System.now()
+        val now = clock.now()
         val id = ErrorLogsTable.insertAndGetId {
             it[errorType] = error.errorType
             it[message] = error.message

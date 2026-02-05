@@ -5,7 +5,8 @@ import com.turki.core.repository.ReminderPreferenceRepository
 import kotlinx.datetime.Clock
 
 class ReminderPreferenceService(
-    private val reminderPreferenceRepository: ReminderPreferenceRepository
+    private val reminderPreferenceRepository: ReminderPreferenceRepository,
+    private val clock: Clock = Clock.System
 ) {
     suspend fun getOrDefault(userId: Long): ReminderPreference {
         return reminderPreferenceRepository.findByUserId(userId) ?: ReminderPreference(
@@ -31,7 +32,7 @@ class ReminderPreferenceService(
 
     suspend fun markFired(userId: Long) {
         reminderPreferenceRepository.upsert(
-            getOrDefault(userId).copy(lastFiredAt = Clock.System.now())
+            getOrDefault(userId).copy(lastFiredAt = clock.now())
         )
     }
 }

@@ -9,7 +9,9 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 
-class ReminderPreferenceRepositoryImpl : ReminderPreferenceRepository {
+class ReminderPreferenceRepositoryImpl(
+    private val clock: Clock = Clock.System
+) : ReminderPreferenceRepository {
     override suspend fun findByUserId(userId: Long): ReminderPreference? = DatabaseFactory.dbQuery {
         ReminderPreferencesTable.selectAll()
             .where { ReminderPreferencesTable.userId eq userId }
@@ -40,7 +42,7 @@ class ReminderPreferenceRepositoryImpl : ReminderPreferenceRepository {
 
     override suspend fun updateLastFired(userId: Long): Boolean = DatabaseFactory.dbQuery {
         ReminderPreferencesTable.update({ ReminderPreferencesTable.userId eq userId }) {
-            it[lastFiredAt] = Clock.System.now()
+            it[lastFiredAt] = clock.now()
         } > 0
     }
 

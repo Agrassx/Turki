@@ -1,6 +1,5 @@
 package com.turki.core.service
 
-import com.turki.core.database.DatabaseFactory
 import com.turki.core.database.HomeworkQuestionsTable
 import com.turki.core.database.HomeworksTable
 import com.turki.core.database.LessonsTable
@@ -18,7 +17,10 @@ import org.slf4j.LoggerFactory
  * Service for importing lessons, vocabulary and homework data from CSV content.
  * Can be used via API endpoints or CLI.
  */
-class DataImportService {
+class DataImportService(
+    private val csvParser: CsvParser = DefaultCsvParser(),
+    private val dbRunner: DatabaseRunner = ExposedDatabaseRunner()
+) {
     private val logger = LoggerFactory.getLogger(DataImportService::class.java)
 
     data class ImportResult(
@@ -33,12 +35,12 @@ class DataImportService {
      * CSV format: order_index,target_language,title,description,content[,level,content_version,is_active]
      */
     suspend fun importLessons(csvContent: String, clearExisting: Boolean = false): ImportResult {
-        val records = parseCsv(csvContent).drop(1) // Skip header
+        val records = csvParser.parse(csvContent).drop(1) // Skip header
         val errors = mutableListOf<String>()
         var imported = 0
         var updated = 0
 
-        DatabaseFactory.dbQuery {
+        dbRunner.run {
             if (clearExisting) {
                 VocabularyTable.deleteAll()
                 HomeworkQuestionsTable.deleteAll()
@@ -116,11 +118,11 @@ class DataImportService {
      * CSV format: lesson_order_index,word,translation[,pronunciation,example]
      */
     suspend fun importVocabulary(csvContent: String, clearExisting: Boolean = false): ImportResult {
-        val records = parseCsv(csvContent).drop(1)
+        val records = csvParser.parse(csvContent).drop(1)
         val errors = mutableListOf<String>()
         var imported = 0
 
-        DatabaseFactory.dbQuery {
+        dbRunner.run {
             if (clearExisting) {
                 VocabularyTable.deleteAll()
                 logger.info("Cleared existing vocabulary data")
@@ -177,11 +179,11 @@ class DataImportService {
      * CSV format: lesson_order_index,question_type,question_text,options,correct_answer
      */
     suspend fun importHomework(csvContent: String, clearExisting: Boolean = false): ImportResult {
-        val records = parseCsv(csvContent).drop(1)
+        val records = csvParser.parse(csvContent).drop(1)
         val errors = mutableListOf<String>()
         var imported = 0
 
-        DatabaseFactory.dbQuery {
+        dbRunner.run {
             if (clearExisting) {
                 HomeworkQuestionsTable.deleteAll()
                 HomeworksTable.deleteAll()
@@ -262,51 +264,5 @@ class DataImportService {
 
         logger.info("Homework import: $imported questions imported")
         return ImportResult(errors.isEmpty(), imported, 0, errors)
-    }
-
-    private fun parseCsv(content: String): List<List<String>> {
-        val records = mutableListOf<List<String>>()
-        val currentRecord = mutableListOf<String>()
-        val currentField = StringBuilder()
-        var inQuotes = false
-
-        var i = 0
-        while (i < content.length) {
-            val char = content[i]
-            when {
-                char == '"' -> {
-                    if (inQuotes && i + 1 < content.length && content[i + 1] == '"') {
-                        currentField.append('"')
-                        i++
-                    } else {
-                        inQuotes = !inQuotes
-                    }
-                }
-                char == ',' && !inQuotes -> {
-                    currentRecord.add(currentField.toString())
-                    currentField.clear()
-                }
-                (char == '\n' || char == '\r') && !inQuotes -> {
-                    currentRecord.add(currentField.toString())
-                    currentField.clear()
-                    if (currentRecord.isNotEmpty()) {
-                        records.add(currentRecord.toList())
-                        currentRecord.clear()
-                    }
-                    if (char == '\r' && i + 1 < content.length && content[i + 1] == '\n') {
-                        i++
-                    }
-                }
-                else -> currentField.append(char)
-            }
-            i++
-        }
-
-        if (currentField.isNotEmpty() || currentRecord.isNotEmpty()) {
-            currentRecord.add(currentField.toString())
-            records.add(currentRecord.toList())
-        }
-
-        return records
     }
 }

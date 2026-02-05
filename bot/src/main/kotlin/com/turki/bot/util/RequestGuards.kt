@@ -3,11 +3,14 @@ package com.turki.bot.util
 import kotlinx.datetime.Clock
 import java.util.concurrent.ConcurrentHashMap
 
-class UpdateDeduper(private val ttlMs: Long = 60_000L) {
+class UpdateDeduper(
+    private val ttlMs: Long = 60_000L,
+    private val clock: Clock = Clock.System
+) {
     private val seen = ConcurrentHashMap<String, Long>()
 
     fun shouldProcess(key: String): Boolean {
-        val now = Clock.System.now().toEpochMilliseconds()
+        val now = clock.now().toEpochMilliseconds()
         val previous = seen.putIfAbsent(key, now)
         cleanup(now)
         return previous == null
@@ -18,11 +21,14 @@ class UpdateDeduper(private val ttlMs: Long = 60_000L) {
     }
 }
 
-class RateLimiter(private val minIntervalMs: Long = 300L) {
+class RateLimiter(
+    private val minIntervalMs: Long = 300L,
+    private val clock: Clock = Clock.System
+) {
     private val lastAction = ConcurrentHashMap<Long, Long>()
 
     fun allow(userId: Long): Boolean {
-        val now = Clock.System.now().toEpochMilliseconds()
+        val now = clock.now().toEpochMilliseconds()
         val previous = lastAction.put(userId, now)
         return previous == null || now - previous > minIntervalMs
     }
