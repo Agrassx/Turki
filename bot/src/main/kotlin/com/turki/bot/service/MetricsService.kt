@@ -27,7 +27,6 @@ import org.slf4j.LoggerFactory
 /**
  * Service for collecting metrics and generating reports.
  */
-@Suppress("TooManyFunctions")
 class MetricsService(
     private val metricsRepository: MetricsRepository,
     private val analyticsRepository: AnalyticsRepository,

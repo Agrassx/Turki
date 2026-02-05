@@ -1,6 +1,5 @@
 package com.turki.bot.i18n
 
-@Suppress("TooManyFunctions")
 object RussianStrings : Strings {
     override fun welcome(firstName: String) = """
 Merhaba, $firstName! 👋
@@ -85,15 +84,6 @@ Merhaba, $firstName! 👋
 
     override fun vocabularyItem(word: String, translation: String) =
         "• <b>$word</b> — $translation"
-
-    override fun vocabularyWordTitle(word: String, translation: String) =
-        "📖 <b>$word</b> — $translation"
-
-    override fun vocabularyPronunciation(pronunciation: String) =
-        "  🔊 <i>[$pronunciation]</i>"
-
-    override fun vocabularyExample(example: String) =
-        "  📝 <i>$example</i>"
 
     override val homeworkNotReady = "Домашнее задание для этого урока пока не готово."
 

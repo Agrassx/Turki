@@ -16,7 +16,6 @@ package com.turki.bot.i18n
  * Implementations should provide localized strings for each supported language.
  * All strings support HTML formatting for Telegram's HTML parse mode.
  */
-@Suppress("TooManyFunctions")
 interface Strings {
     fun welcome(firstName: String): String
     val notRegistered: String
@@ -29,10 +28,7 @@ interface Strings {
     val vocabularyTitle: String
     fun vocabularyForLesson(lessonId: Int): String
     val vocabularyEmpty: String
-    fun vocabularyWordTitle(word: String, translation: String): String
     fun vocabularyItem(word: String, translation: String): String
-    fun vocabularyPronunciation(pronunciation: String): String
-    fun vocabularyExample(example: String): String
     val homeworkNotReady: String
     val homeworkAlreadyCompleted: String
     fun questionTitle(index: Int): String

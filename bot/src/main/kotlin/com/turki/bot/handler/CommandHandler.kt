@@ -4,11 +4,9 @@ import com.turki.bot.i18n.S
 import com.turki.bot.service.AnalyticsService
 import com.turki.bot.service.DictionaryService
 import com.turki.core.domain.EventNames
-import com.turki.bot.service.ExerciseService
 import com.turki.bot.service.LessonService
 import com.turki.bot.service.ProgressService
 import com.turki.bot.service.ReminderPreferenceService
-import com.turki.bot.service.ReviewService
 import com.turki.bot.service.UserDataService
 import com.turki.bot.service.UserService
 import com.turki.bot.service.UserStateService
@@ -44,8 +42,6 @@ class CommandHandler(
     private val lessonService: LessonService,
     private val progressService: ProgressService,
     private val dictionaryService: DictionaryService,
-    @Suppress("unused") private val reviewService: ReviewService,
-    @Suppress("unused") private val exerciseService: ExerciseService,
     private val userStateService: UserStateService,
     private val analyticsService: AnalyticsService,
     private val reminderPreferenceService: ReminderPreferenceService,
@@ -200,8 +196,8 @@ class CommandHandler(
             appendLine()
             vocabulary.forEach { item ->
                 appendLine(S.vocabularyItem(item.word, item.translation))
-                item.pronunciation?.let { appendLine(S.vocabularyPronunciation(it)) }
-                item.example?.let { appendLine(S.vocabularyExample(it)) }
+                item.pronunciation?.let { appendLine(S.dictionaryPronunciation(it)) }
+                item.example?.let { appendLine(S.dictionaryExample(it)) }
                 appendLine()
             }
         }
@@ -498,8 +494,8 @@ class CommandHandler(
             appendLine()
             pageEntries.forEach { entry ->
                 appendLine(S.vocabularyItem(entry.word, entry.translation))
-                entry.pronunciation?.let { appendLine(S.vocabularyPronunciation(it)) }
-                entry.example?.let { appendLine(S.vocabularyExample(it)) }
+                entry.pronunciation?.let { appendLine(S.dictionaryPronunciation(it)) }
+                entry.example?.let { appendLine(S.dictionaryExample(it)) }
                 appendLine()
             }
             if (totalPages > 1) {
