@@ -107,6 +107,7 @@ class MetricsService(
 
         // Support
         val supportToday = metricsRepository.countEventsSince(EventNames.SUPPORT_MESSAGE_SENT, oneDayAgo)
+        val supportRepliesToday = metricsRepository.countEventsSince(EventNames.SUPPORT_REPLY_SENT, oneDayAgo)
 
         // Errors
         val errorsToday = metricsRepository.countErrorsSince(oneDayAgo)
@@ -139,6 +140,7 @@ class MetricsService(
             reviewSessionsToday = reviewToday,
             practiceSessionsToday = practiceToday,
             supportMessagesToday = supportToday,
+            supportRepliesToday = supportRepliesToday,
             errorsToday = errorsToday,
             topCommands = topCommands,
             retentionDay1 = retentionD1,
@@ -279,6 +281,7 @@ ${userId?.let { "<b>User ID:</b> <code>$it</code>" } ?: ""}
 
 📬 <b>Поддержка:</b>
 • Обращений: <b>${report.supportMessagesToday}</b>
+• Ответов: <b>${report.supportRepliesToday}</b>
 
 ${if (report.errorsToday > 0) "⚠️ <b>Ошибок за день:</b> ${report.errorsToday}" else "✅ Ошибок нет"}
 

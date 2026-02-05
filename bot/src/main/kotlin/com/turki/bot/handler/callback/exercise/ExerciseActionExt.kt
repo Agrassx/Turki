@@ -107,7 +107,7 @@ internal suspend fun sendExercise(
 
     val buttons = options.mapIndexed { index, option ->
         listOf(dataInlineButton(option, "exercise_answer:${payload.lessonId}:$vocabId:$index"))
-    }
+    } + listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
 
     analyticsService.log(
         EventNames.PRACTICE_STARTED,

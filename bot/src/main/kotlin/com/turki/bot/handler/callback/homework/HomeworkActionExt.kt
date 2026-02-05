@@ -56,6 +56,7 @@ internal suspend fun buildHomeworkWrongButtons(
         add(listOf(dataInlineButton(S.btnAddCustomWord, "dict_add_custom")))
     }
     add(listOf(dataInlineButton(S.btnNext, "hw_next:$homeworkId:$questionId")))
+    add(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
 }
 
 internal fun buildHomeworkFeedback(
@@ -128,7 +129,7 @@ internal suspend fun sendQuestion(
         QuestionType.MULTIPLE_CHOICE -> {
             val buttons = question.options.mapIndexed { optIndex, option ->
                 listOf(dataInlineButton(option, "answer:$homeworkId:${question.id}:$optIndex"))
-            }
+            } + listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
             context.editOrSendHtml(
                 query,
                 questionText,

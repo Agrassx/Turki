@@ -51,6 +51,7 @@ data class DailyReport(
     val reviewSessionsToday: Long,
     val practiceSessionsToday: Long,
     val supportMessagesToday: Long,
+    val supportRepliesToday: Long,
     val errorsToday: Long,
     val topCommands: Map<String, Long>,
     val retentionDay1: Double, // % of users who returned next day
@@ -114,6 +115,7 @@ object EventNames {
 
     // Support
     const val SUPPORT_MESSAGE_SENT = "support_message_sent"
+    const val SUPPORT_REPLY_SENT = "support_reply_sent"
 
     // Errors
     const val ERROR_OCCURRED = "error_occurred"

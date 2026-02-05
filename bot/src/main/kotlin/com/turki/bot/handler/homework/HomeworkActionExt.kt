@@ -69,7 +69,8 @@ internal suspend fun handleIncorrectAnswer(
     val buttons = InlineKeyboardMarkup(
         listOf(
             addButton,
-            listOf(dataInlineButton(S.btnNext, "hw_next:$homeworkId:$questionId"))
+            listOf(dataInlineButton(S.btnNext, "hw_next:$homeworkId:$questionId")),
+            listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
         )
     )
     val text = buildString {
@@ -103,7 +104,7 @@ internal suspend fun sendNextQuestion(
         QuestionType.MULTIPLE_CHOICE -> {
             val buttons = nextQuestion.options.mapIndexed { optIndex, option ->
                 listOf(dataInlineButton(option, "answer:$homeworkId:${nextQuestion.id}:$optIndex"))
-            }
+            } + listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
             context.sendHtml(
                 message.chat,
                 questionText,

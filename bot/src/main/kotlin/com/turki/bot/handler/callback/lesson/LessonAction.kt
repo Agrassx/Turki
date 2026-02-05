@@ -47,7 +47,8 @@ class LessonAction(
                     listOf(dataInlineButton(S.btnVocabulary, "vocabulary:${lesson.id}")),
                     listOf(dataInlineButton(S.btnGoToHomework, "homework:${lesson.id}")),
                     listOf(dataInlineButton(S.btnStartPractice, "lesson_practice:${lesson.id}")),
-                    listOf(dataInlineButton(S.btnSetReminder, "set_reminder"))
+                    listOf(dataInlineButton(S.btnSetReminder, "set_reminder")),
+                    listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
                 )
             )
         )

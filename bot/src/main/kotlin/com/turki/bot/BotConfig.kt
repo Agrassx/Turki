@@ -3,11 +3,13 @@ package com.turki.bot
 import com.turki.bot.handler.CallbackHandler
 import com.turki.bot.handler.CommandHandler
 import com.turki.bot.handler.HomeworkHandler
+import com.turki.bot.service.AnalyticsService
 import com.turki.bot.service.SupportService
 import com.turki.bot.service.UserService
 import com.turki.bot.service.UserStateService
 import com.turki.bot.service.UserFlowState
 import com.turki.bot.i18n.S
+import com.turki.core.domain.EventNames
 import com.turki.bot.util.RateLimiter
 import com.turki.bot.util.UpdateDeduper
 import dev.inmo.tgbotapi.bot.ktor.telegramBot
@@ -30,6 +32,7 @@ private val supportService: SupportService by inject(SupportService::class.java)
 private val callbackHandler: CallbackHandler by inject(CallbackHandler::class.java)
 private val commandHandler: CommandHandler by inject(CommandHandler::class.java)
 private val homeworkHandler: HomeworkHandler by inject(HomeworkHandler::class.java)
+private val analyticsService: AnalyticsService by inject(AnalyticsService::class.java)
 
 private data class BotHandlers(
     val commandHandler: CommandHandler,
@@ -145,6 +148,9 @@ private suspend fun BehaviourContext.registerUserTextHandlers(
                 userStateService.clear(user.id)
                 val sent = supportService.sendToAdmin(bot, user, text)
                 sendMessage(message.chat, if (sent) S.supportSent else "❌ Ошибка отправки")
+                if (sent) {
+                    analyticsService.log(EventNames.SUPPORT_MESSAGE_SENT, user.id)
+                }
             }
             else -> homeworkHandler.handleTextAnswer(this, message)
         }
@@ -164,7 +170,13 @@ private suspend fun BehaviourContext.registerUserTextHandlers(
 
         val userTelegramId = supportService.extractUserIdFromReply(replyText) ?: return@onText
         val adminReply = message.content.text
-        supportService.sendReplyToUser(bot, userTelegramId, adminReply)
+        val replied = supportService.sendReplyToUser(bot, userTelegramId, adminReply)
+        if (replied) {
+            val targetUser = userService.findByTelegramId(userTelegramId)
+            if (targetUser != null) {
+                analyticsService.log(EventNames.SUPPORT_REPLY_SENT, targetUser.id)
+            }
+        }
     }
 }
 

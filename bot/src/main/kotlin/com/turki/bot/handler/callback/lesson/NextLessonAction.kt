@@ -43,7 +43,9 @@ class NextLessonAction(
             replyMarkup = InlineKeyboardMarkup(
                 listOf(
                     listOf(dataInlineButton(S.btnVocabulary, "vocabulary:${nextLesson.id}")),
-                    listOf(dataInlineButton(S.btnGoToHomework, "homework:${nextLesson.id}"))
+                    listOf(dataInlineButton(S.btnGoToHomework, "homework:${nextLesson.id}")),
+                    listOf(dataInlineButton(S.btnStartPractice, "lesson_practice:${nextLesson.id}")),
+                    listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
                 )
             )
         )

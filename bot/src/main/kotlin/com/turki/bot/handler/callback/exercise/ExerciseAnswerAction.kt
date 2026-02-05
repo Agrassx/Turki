@@ -77,11 +77,15 @@ class ExerciseAnswerAction(
 
         val explanation = payload.explanationsByVocabId[vocabId] ?: ""
         val buttons = if (isCorrect) {
-            listOf(listOf(dataInlineButton(S.btnNext, "exercise_next")))
+            listOf(
+                listOf(dataInlineButton(S.btnNext, "exercise_next")),
+                listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
+            )
         } else {
             listOf(
                 listOf(dataInlineButton(S.btnAddToDictionary, "exercise_add_dict:$vocabId")),
-                listOf(dataInlineButton(S.btnNext, "exercise_next"))
+                listOf(dataInlineButton(S.btnNext, "exercise_next")),
+                listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
             )
         }
 
