@@ -2,6 +2,7 @@ package com.turki.bot
 
 import com.turki.bot.i18n.S
 import com.turki.bot.service.AnalyticsService
+import com.turki.bot.service.ErrorNotifierService
 import com.turki.bot.service.ProgressService
 import com.turki.bot.service.ReminderPreferenceService
 import com.turki.bot.service.ReminderService
@@ -28,6 +29,7 @@ private val userService: UserService by inject(UserService::class.java)
 private val reminderPreferenceService: ReminderPreferenceService by inject(ReminderPreferenceService::class.java)
 private val progressService: ProgressService by inject(ProgressService::class.java)
 private val analyticsService: AnalyticsService by inject(AnalyticsService::class.java)
+private val errorNotifierScheduler: ErrorNotifierService by inject(ErrorNotifierService::class.java)
 
 suspend fun startReminderScheduler(
     bot: TelegramBot,
@@ -63,6 +65,7 @@ suspend fun startReminderScheduler(
             sendWeeklyReports(bot, clock, timeZone)
         } catch (e: Exception) {
             logger.error("Error in reminder scheduler: ${e.message}")
+            errorNotifierScheduler.notify("ReminderSchedulerError", e.message ?: "Unknown", e)
         }
 
         delay(1.minutes)

@@ -1,5 +1,6 @@
 package com.turki.bot
 
+import com.turki.bot.service.ErrorNotifierService
 import com.turki.bot.service.MetricsService
 import dev.inmo.tgbotapi.bot.TelegramBot
 import kotlinx.coroutines.delay
@@ -11,6 +12,7 @@ import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger("DailyReportScheduler")
 private val metricsService: MetricsService by inject(MetricsService::class.java)
+private val errorNotifier: ErrorNotifierService by inject(ErrorNotifierService::class.java)
 
 private const val POST_REPORT_DELAY_MS = 60_000L
 private const val ERROR_RETRY_DELAY_MS = 300_000L
@@ -29,6 +31,7 @@ suspend fun sendStartupReport(bot: TelegramBot) {
         metricsService.sendStartupReport(bot)
     } catch (e: Exception) {
         logger.error("Failed to send startup report: ${e.message}")
+        errorNotifier.notify("StartupReportError", e.message ?: "Unknown", e)
     }
 }
 
@@ -81,6 +84,7 @@ suspend fun startDailyReportScheduler(
                 message = "Daily report scheduler failed: ${e.message}",
                 stackTrace = e.stackTraceToString()
             )
+            errorNotifier.notify("DailyReportError", e.message ?: "Unknown", e)
             delay(ERROR_RETRY_DELAY_MS) // Wait 5 minutes before retry
         }
     }

@@ -12,6 +12,10 @@ class CallbackHandler(
     private val logger = LoggerFactory.getLogger("CallbackHandler")
     private val actionMap = actions.associateBy { it.action }
 
+    init {
+        logger.info("Registered ${actionMap.size} callback actions: ${actionMap.keys.sorted().joinToString()}")
+    }
+
     suspend fun handleCallback(context: BehaviourContext, query: DataCallbackQuery) {
         val data = query.data
         val parts = data.split(":")

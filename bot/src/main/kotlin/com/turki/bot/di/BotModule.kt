@@ -81,6 +81,7 @@ import com.turki.bot.service.HomeworkService
 import com.turki.bot.service.LessonService
 import com.turki.bot.service.AnalyticsService
 import com.turki.bot.service.DictionaryService
+import com.turki.bot.service.ErrorNotifierService
 import com.turki.bot.service.ExerciseService
 import com.turki.bot.service.ProgressService
 import com.turki.bot.service.ReminderPreferenceService
@@ -93,6 +94,7 @@ import com.turki.bot.service.UserService
 import com.turki.bot.service.UserStateService
 import kotlinx.datetime.TimeZone
 import kotlin.random.Random
+import org.koin.dsl.bind
 import org.koin.dsl.module
 
 val botModule = module {
@@ -112,82 +114,83 @@ val botModule = module {
     single { UserDataService(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     single { SupportService() }
     single { MetricsService(get(), get(), get(), get()) }
+    single { ErrorNotifierService() }
 
-    single<CommandAction> { StartCommand(get(), get(), get()) }
-    single<CommandAction> { LessonCommand(get(), get(), get()) }
-    single<CommandAction> { HomeworkCommand(get(), get()) }
-    single<CommandAction> { ProgressCommand(get(), get(), get()) }
-    single<CommandAction> { HelpCommand(get(), get()) }
-    single<CommandAction> { VocabularyCommand(get(), get(), get()) }
-    single<CommandAction> { MenuCommand(get(), get(), get()) }
-    single<CommandAction> { LessonsCommand(get(), get(), get(), get()) }
-    single<CommandAction> { PracticeCommand(get(), get()) }
-    single<CommandAction> { DictionaryCommand(get(), get(), get()) }
-    single<CommandAction> { ReviewCommand(get(), get()) }
-    single<CommandAction> { RemindersCommand(get(), get(), get()) }
-    single<CommandAction> { ResetCommand(get(), get()) }
-    single<CommandAction> { DeleteCommand(get(), get()) }
-    single<CommandAction> { ExportCommand(get(), get(), get()) }
-    single<CommandAction> { SupportCommand(get(), get(), get()) }
+    single { StartCommand(get(), get(), get()) } bind CommandAction::class
+    single { LessonCommand(get(), get(), get()) } bind CommandAction::class
+    single { HomeworkCommand(get(), get()) } bind CommandAction::class
+    single { ProgressCommand(get(), get(), get()) } bind CommandAction::class
+    single { HelpCommand(get(), get()) } bind CommandAction::class
+    single { VocabularyCommand(get(), get(), get()) } bind CommandAction::class
+    single { MenuCommand(get(), get(), get()) } bind CommandAction::class
+    single { LessonsCommand(get(), get(), get(), get()) } bind CommandAction::class
+    single { PracticeCommand(get(), get()) } bind CommandAction::class
+    single { DictionaryCommand(get(), get(), get()) } bind CommandAction::class
+    single { ReviewCommand(get(), get()) } bind CommandAction::class
+    single { RemindersCommand(get(), get(), get()) } bind CommandAction::class
+    single { ResetCommand(get(), get()) } bind CommandAction::class
+    single { DeleteCommand(get(), get()) } bind CommandAction::class
+    single { ExportCommand(get(), get(), get()) } bind CommandAction::class
+    single { SupportCommand(get(), get(), get()) } bind CommandAction::class
 
-    single<CommandTextAction> { DictionaryQueryTextAction(get(), get(), get()) }
-    single<CommandTextAction> { DictionaryCustomTextAction(get(), get(), get()) }
+    single { DictionaryQueryTextAction(get(), get(), get()) } bind CommandTextAction::class
+    single { DictionaryCustomTextAction(get(), get(), get()) } bind CommandTextAction::class
 
     single { CommandHandler(getAll<CommandAction>(), getAll<CommandTextAction>()) }
 
-    single<HomeworkTextAction> { HomeworkTextAnswerAction(get(), get(), get(), get(), get(), get()) }
+    single { HomeworkTextAnswerAction(get(), get(), get(), get(), get(), get()) } bind HomeworkTextAction::class
     single { HomeworkHandler(getAll<HomeworkTextAction>()) }
 
-    single<CallbackAction> { LessonAction(get()) }
-    single<CallbackAction> { LessonsListAction(get(), get(), get(), get()) }
-    single<CallbackAction> { LessonStartAction(get(), get(), get(), get()) }
-    single<CallbackAction> { LessonPracticeAction(get(), get(), get(), get(), get()) }
-    single<CallbackAction> { PracticeStartAction(get(), get(), get(), get(), get()) }
-    single<CallbackAction> { NextLessonAction(get(), get()) }
-    single<CallbackAction> { VocabularyAction(get(), get(), get()) }
-    single<CallbackAction> { VocabListAction(get(), get(), get()) }
-    single<CallbackAction> { VocabWordAction(get(), get(), get()) }
-    single<CallbackAction> { VocabAddAllAction(get(), get(), get()) }
-    single<CallbackAction> { VocabAddAction(get(), get(), get()) }
-    single<CallbackAction> { VocabRemoveAction(get(), get(), get()) }
-    single<CallbackAction> { HomeworkAction(get(), get()) }
-    single<CallbackAction> { StartHomeworkAction(get(), get(), get(), get()) }
-    single<CallbackAction> { AnswerAction(get(), get(), get(), get(), get(), get()) }
-    single<CallbackAction> { HomeworkNextAction(get(), get(), get(), get(), get(), get()) }
-    single<CallbackAction> { HomeworkAddDictAction(get(), get(), get(), get(), get(), get(), get()) }
-    single<CallbackAction> { NextHomeworkAction(get(), get(), get()) }
-    single<CallbackAction> { ProgressAction(get(), get(), get()) }
-    single<CallbackAction> { SettingsAction() }
-    single<CallbackAction> { ResetProgressAction() }
-    single<CallbackAction> { ConfirmResetAction(get(), get(), get(), get(), get()) }
-    single<CallbackAction> { ConfirmDeleteAction(get(), get()) }
-    single<CallbackAction> { SelectLevelAction() }
-    single<CallbackAction> { SetLevelAction() }
-    single<CallbackAction> { KnowledgeTestAction() }
-    single<CallbackAction> { HelpAction() }
-    single<CallbackAction> { BackToMenuAction(get(), get()) }
-    single<CallbackAction> { ContinueAction(get(), get(), get(), get()) }
-    single<CallbackAction> { DictionaryPromptAction(get(), get()) }
-    single<CallbackAction> { DictListAction(get(), get()) }
-    single<CallbackAction> { DictAddCustomAction(get(), get()) }
-    single<CallbackAction> { DictFavAction(get(), get(), get()) }
-    single<CallbackAction> { DictTagsAction(get()) }
-    single<CallbackAction> { DictTagAction(get(), get()) }
-    single<CallbackAction> { ReviewStartAction(get()) }
-    single<CallbackAction> { ReviewDifficultyAction(get(), get(), get(), get()) }
-    single<CallbackAction> { ReviewSessionAnswerAction(get(), get(), get(), get(), get(), get()) }
-    single<CallbackAction> { ReviewSessionNextAction(get(), get()) }
-    single<CallbackAction> { ReviewAnswerAction(get(), get(), get(), get(), get(), get()) }
-    single<CallbackAction> { SetReminderAction(get(), get()) }
-    single<CallbackAction> { RemindersAction(get(), get()) }
-    single<CallbackAction> { ReminderFrequencyAction(get(), get()) }
-    single<CallbackAction> { ReminderDayToggleAction() }
-    single<CallbackAction> { ReminderDaysConfirmAction() }
-    single<CallbackAction> { ReminderTimeAction(get(), get(), get()) }
-    single<CallbackAction> { ReminderEnableWeekdaysAction(get(), get(), get()) }
-    single<CallbackAction> { ReminderDisableAction(get(), get()) }
-    single<CallbackAction> { ExerciseAnswerAction(get(), get(), get()) }
-    single<CallbackAction> { ExerciseAddDictAction(get(), get(), get(), get(), get(), get()) }
-    single<CallbackAction> { ExerciseNextAction(get(), get(), get(), get(), get()) }
+    single { LessonAction(get()) } bind CallbackAction::class
+    single { LessonsListAction(get(), get(), get(), get()) } bind CallbackAction::class
+    single { LessonStartAction(get(), get(), get(), get()) } bind CallbackAction::class
+    single { LessonPracticeAction(get(), get(), get(), get(), get()) } bind CallbackAction::class
+    single { PracticeStartAction(get(), get(), get(), get(), get()) } bind CallbackAction::class
+    single { NextLessonAction(get(), get()) } bind CallbackAction::class
+    single { VocabularyAction(get(), get(), get()) } bind CallbackAction::class
+    single { VocabListAction(get(), get(), get()) } bind CallbackAction::class
+    single { VocabWordAction(get(), get(), get()) } bind CallbackAction::class
+    single { VocabAddAllAction(get(), get(), get()) } bind CallbackAction::class
+    single { VocabAddAction(get(), get(), get()) } bind CallbackAction::class
+    single { VocabRemoveAction(get(), get(), get()) } bind CallbackAction::class
+    single { HomeworkAction(get(), get()) } bind CallbackAction::class
+    single { StartHomeworkAction(get(), get(), get(), get()) } bind CallbackAction::class
+    single { AnswerAction(get(), get(), get(), get(), get(), get()) } bind CallbackAction::class
+    single { HomeworkNextAction(get(), get(), get(), get(), get(), get()) } bind CallbackAction::class
+    single { HomeworkAddDictAction(get(), get(), get(), get(), get(), get(), get()) } bind CallbackAction::class
+    single { NextHomeworkAction(get(), get(), get()) } bind CallbackAction::class
+    single { ProgressAction(get(), get(), get()) } bind CallbackAction::class
+    single { SettingsAction() } bind CallbackAction::class
+    single { ResetProgressAction() } bind CallbackAction::class
+    single { ConfirmResetAction(get(), get(), get(), get(), get()) } bind CallbackAction::class
+    single { ConfirmDeleteAction(get(), get()) } bind CallbackAction::class
+    single { SelectLevelAction() } bind CallbackAction::class
+    single { SetLevelAction() } bind CallbackAction::class
+    single { KnowledgeTestAction() } bind CallbackAction::class
+    single { HelpAction() } bind CallbackAction::class
+    single { BackToMenuAction(get(), get()) } bind CallbackAction::class
+    single { ContinueAction(get(), get(), get(), get()) } bind CallbackAction::class
+    single { DictionaryPromptAction(get(), get()) } bind CallbackAction::class
+    single { DictListAction(get(), get()) } bind CallbackAction::class
+    single { DictAddCustomAction(get(), get()) } bind CallbackAction::class
+    single { DictFavAction(get(), get(), get()) } bind CallbackAction::class
+    single { DictTagsAction(get()) } bind CallbackAction::class
+    single { DictTagAction(get(), get()) } bind CallbackAction::class
+    single { ReviewStartAction(get()) } bind CallbackAction::class
+    single { ReviewDifficultyAction(get(), get(), get(), get()) } bind CallbackAction::class
+    single { ReviewSessionAnswerAction(get(), get(), get(), get(), get(), get()) } bind CallbackAction::class
+    single { ReviewSessionNextAction(get(), get()) } bind CallbackAction::class
+    single { ReviewAnswerAction(get(), get(), get(), get(), get(), get()) } bind CallbackAction::class
+    single { SetReminderAction(get(), get()) } bind CallbackAction::class
+    single { RemindersAction(get(), get()) } bind CallbackAction::class
+    single { ReminderFrequencyAction(get(), get()) } bind CallbackAction::class
+    single { ReminderDayToggleAction() } bind CallbackAction::class
+    single { ReminderDaysConfirmAction() } bind CallbackAction::class
+    single { ReminderTimeAction(get(), get(), get()) } bind CallbackAction::class
+    single { ReminderEnableWeekdaysAction(get(), get(), get()) } bind CallbackAction::class
+    single { ReminderDisableAction(get(), get()) } bind CallbackAction::class
+    single { ExerciseAnswerAction(get(), get(), get()) } bind CallbackAction::class
+    single { ExerciseAddDictAction(get(), get(), get(), get(), get(), get()) } bind CallbackAction::class
+    single { ExerciseNextAction(get(), get(), get(), get(), get()) } bind CallbackAction::class
     single { CallbackHandler(getAll()) }
 }

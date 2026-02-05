@@ -16,6 +16,11 @@ class CommandHandler(
     private val actionMap = actions.associateBy { it.command }
     private val textActionMap = textActions.associateBy { it.state }
 
+    init {
+        logger.info("Registered ${actionMap.size} commands: ${actionMap.keys.sorted().joinToString()}")
+        logger.info("Registered ${textActionMap.size} text actions: ${textActionMap.keys.joinToString()}")
+    }
+
     suspend fun handleCommand(command: String, context: BehaviourContext, message: CommonMessage<TextContent>) {
         val handler = actionMap[command]
         if (handler != null) {
