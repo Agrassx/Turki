@@ -13,6 +13,9 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlin.random.Random
 
+private const val FULL_ACCURACY = 100
+private const val WEAK_RATIO = 0.7
+
 class ReviewService(
     private val lessonService: LessonService,
     private val reviewRepository: ReviewRepository,
@@ -37,6 +40,7 @@ class ReviewService(
      * Questions include vocabulary, homework questions, and user's dictionary.
      * Supports both RU→TR and TR→RU translation directions.
      */
+    @Suppress("LongMethod")
     suspend fun buildReviewSession(
         userId: Long,
         currentLessonId: Int,
@@ -44,6 +48,10 @@ class ReviewService(
     ): ReviewSessionPayload {
         val questionCount = difficulty.questionCount
         val questions = mutableListOf<ReviewQuestion>()
+
+        // Build accuracy map from review cards
+        val cards = reviewRepository.getAllByUser(userId)
+        val accuracyMap = cards.associate { it.vocabularyId to (it.accuracyPercent ?: FULL_ACCURACY) }
 
         // 1. Get vocabulary from user's dictionary (favorites)
         val userDictionary = userDictionaryRepository.listFavorites(userId, questionCount)
@@ -63,33 +71,41 @@ class ReviewService(
         // Build vocabulary pool for generating options
         val allVocabulary = (userDictionary + lessonVocabulary).distinctBy { it.id }
 
-        // Generate questions from user dictionary (priority)
-        userDictionary.take(questionCount / 3).forEach { vocab ->
-            val direction = if (random.nextBoolean()) TranslationDirection.RU_TO_TR else TranslationDirection.TR_TO_RU
-            questions.add(createVocabularyQuestion(vocab, direction, allVocabulary, ReviewSourceType.USER_DICTIONARY))
-        }
+        // Sort vocabulary by accuracy (weakest first), then take ~70% weak + 30% well-known
+        val sortedVocab = allVocabulary.sortedBy { accuracyMap[it.id] ?: FULL_ACCURACY }
+        val weakCount = (questionCount * WEAK_RATIO).toInt().coerceAtMost(sortedVocab.size)
+        val strongPool = sortedVocab.drop(weakCount).shuffled(random)
+        val weakPool = sortedVocab.take(weakCount)
 
-        // Generate questions from lesson vocabulary
-        val vocabNeeded = (questionCount * 2 / 3) - questions.size
-        lessonVocabulary.shuffled(random).take(vocabNeeded).forEach { vocab ->
+        // Generate questions from weak words first
+        val vocabForQuestions = (weakPool + strongPool).distinctBy { it.id }
+
+        vocabForQuestions.take(questionCount).forEach { vocab ->
+            val sourceType = if (userDictionary.any { it.id == vocab.id }) {
+                ReviewSourceType.USER_DICTIONARY
+            } else {
+                ReviewSourceType.VOCABULARY
+            }
             val direction = if (random.nextBoolean()) TranslationDirection.RU_TO_TR else TranslationDirection.TR_TO_RU
-            questions.add(createVocabularyQuestion(vocab, direction, allVocabulary, ReviewSourceType.VOCABULARY))
+            questions.add(createVocabularyQuestion(vocab, direction, allVocabulary, sourceType))
         }
 
         // Add homework questions if we need more
         val homeworkNeeded = questionCount - questions.size
-        homeworkQuestions.shuffled(random).take(homeworkNeeded).forEach { hw ->
-            questions.add(
-                ReviewQuestion(
-                    id = "hw_${hw.id}",
-                    sourceType = ReviewSourceType.HOMEWORK,
-                    sourceId = hw.id,
-                    questionText = hw.questionText,
-                    correctAnswer = hw.correctAnswer,
-                    options = hw.options.takeIf { it.isNotEmpty() },
-                    direction = TranslationDirection.RU_TO_TR // Homework is typically RU→TR
+        if (homeworkNeeded > 0) {
+            homeworkQuestions.shuffled(random).take(homeworkNeeded).forEach { hw ->
+                questions.add(
+                    ReviewQuestion(
+                        id = "hw_${hw.id}",
+                        sourceType = ReviewSourceType.HOMEWORK,
+                        sourceId = hw.id,
+                        questionText = hw.questionText,
+                        correctAnswer = hw.correctAnswer,
+                        options = hw.options.takeIf { it.isNotEmpty() },
+                        direction = TranslationDirection.RU_TO_TR
+                    )
                 )
-            )
+            }
         }
 
         // Fill remaining with more vocabulary if needed
@@ -110,8 +126,10 @@ class ReviewService(
                 }
         }
 
+        val finalQuestions = deduplicateConsecutive(questions.shuffled(random)) { it.sourceId }
+
         return ReviewSessionPayload(
-            questions = questions.shuffled(random).take(questionCount),
+            questions = finalQuestions.take(questionCount),
             currentIndex = 0,
             correctCount = 0,
             difficulty = difficulty
@@ -185,15 +203,24 @@ class ReviewService(
             else -> (existing.stage - 1).coerceAtLeast(0)
         }
         val nextReviewAt = nextReviewTime(stage, clock.now())
+        val newTotal = (existing?.totalAttempts ?: 0) + 1
+        val newCorrect = (existing?.correctCount ?: 0) + if (correct) 1 else 0
         reviewRepository.upsert(
             ReviewCard(
                 userId = userId,
                 vocabularyId = vocabularyId,
                 stage = stage,
                 nextReviewAt = nextReviewAt,
-                lastResult = correct
+                lastResult = correct,
+                correctCount = newCorrect,
+                totalAttempts = newTotal
             )
         )
+    }
+
+    /** Returns all review cards for a user (for word stats display). */
+    suspend fun getAllCards(userId: Long): List<ReviewCard> {
+        return reviewRepository.getAllByUser(userId)
     }
 
     private fun nextReviewTime(stage: Int, now: kotlinx.datetime.Instant): kotlinx.datetime.Instant {

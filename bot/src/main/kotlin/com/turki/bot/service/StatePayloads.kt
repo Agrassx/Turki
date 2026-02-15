@@ -108,3 +108,26 @@ data class LearnSessionPayload(
     val correctCount: Int,
     val difficulty: LearnDifficulty
 )
+
+/**
+ * Reorders a list so that no two consecutive items share the same key.
+ * If impossible (e.g. one key dominates), it does its best.
+ */
+fun <T> deduplicateConsecutive(items: List<T>, keyFn: (T) -> Any): List<T> {
+    if (items.size <= 1) return items
+    val result = items.toMutableList()
+    for (i in 1 until result.size) {
+        if (keyFn(result[i]) == keyFn(result[i - 1])) {
+            // Find the nearest different-key item to swap with
+            val swapIdx = ((i + 1) until result.size).firstOrNull { j ->
+                keyFn(result[j]) != keyFn(result[i - 1])
+            }
+            if (swapIdx != null) {
+                val tmp = result[i]
+                result[i] = result[swapIdx]
+                result[swapIdx] = tmp
+            }
+        }
+    }
+    return result
+}

@@ -29,6 +29,12 @@ class ReviewRepositoryImpl : ReviewRepository {
                 .singleOrNull()
         }
 
+    override suspend fun getAllByUser(userId: Long): List<ReviewCard> = DatabaseFactory.dbQuery {
+        ReviewCardsTable.selectAll()
+            .where { ReviewCardsTable.userId eq userId }
+            .map(::toCard)
+    }
+
     override suspend fun upsert(card: ReviewCard): ReviewCard = DatabaseFactory.dbQuery {
         val updated = ReviewCardsTable.update({
             (ReviewCardsTable.userId eq card.userId) and
@@ -37,6 +43,8 @@ class ReviewRepositoryImpl : ReviewRepository {
             it[stage] = card.stage
             it[nextReviewAt] = card.nextReviewAt
             it[lastResult] = card.lastResult
+            it[correctCount] = card.correctCount
+            it[totalAttempts] = card.totalAttempts
         }
 
         if (updated == 0) {
@@ -46,6 +54,8 @@ class ReviewRepositoryImpl : ReviewRepository {
                 it[stage] = card.stage
                 it[nextReviewAt] = card.nextReviewAt
                 it[lastResult] = card.lastResult
+                it[correctCount] = card.correctCount
+                it[totalAttempts] = card.totalAttempts
             }
         }
 
@@ -61,6 +71,8 @@ class ReviewRepositoryImpl : ReviewRepository {
         vocabularyId = row[ReviewCardsTable.vocabularyId].value,
         stage = row[ReviewCardsTable.stage],
         nextReviewAt = row[ReviewCardsTable.nextReviewAt],
-        lastResult = row[ReviewCardsTable.lastResult]
+        lastResult = row[ReviewCardsTable.lastResult],
+        correctCount = row[ReviewCardsTable.correctCount],
+        totalAttempts = row[ReviewCardsTable.totalAttempts]
     )
 }

@@ -37,7 +37,7 @@ class LearnDifficultyAction(
 
         val user = userService.findByTelegramId(query.from.id.chatId.long) ?: return
 
-        val session = learnWordsService.buildSession(user.currentLessonId, difficulty)
+        val session = learnWordsService.buildSession(user.id, user.currentLessonId, difficulty)
 
         if (session.questions.isEmpty()) {
             context.editOrSendHtml(

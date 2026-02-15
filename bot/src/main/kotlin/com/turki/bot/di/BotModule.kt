@@ -33,6 +33,7 @@ import com.turki.bot.handler.callback.menu.HelpAction
 import com.turki.bot.handler.callback.menu.KnowledgeTestAction
 import com.turki.bot.handler.callback.menu.ProgressAction
 import com.turki.bot.handler.callback.menu.ResetProgressAction
+import com.turki.bot.handler.callback.menu.WordStatsAction
 import com.turki.bot.handler.callback.menu.SelectLevelAction
 import com.turki.bot.handler.callback.menu.SetLevelAction
 import com.turki.bot.handler.callback.menu.SettingsAction
@@ -117,7 +118,7 @@ val botModule = module {
     single { ProgressService(get(), get(), get(), get(), get()) }
     single { DictionaryService(get(), get(), get(), get()) }
     single { ReviewService(get(), get(), get(), get(), get(), get(), get()) }
-    single { LearnWordsService(get(), get()) }
+    single { LearnWordsService(get(), get(), get()) }
     single { ReminderPreferenceService(get(), get()) }
     single { AnalyticsService(get(), get()) }
     single { UserDataService(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
@@ -169,6 +170,7 @@ val botModule = module {
     single { HomeworkAddDictAction(get(), get(), get(), get(), get(), get(), get()) } bind CallbackAction::class
     single { NextHomeworkAction(get(), get(), get()) } bind CallbackAction::class
     single { ProgressAction(get(), get(), get()) } bind CallbackAction::class
+    single { WordStatsAction(get(), get(), get()) } bind CallbackAction::class
     single { SettingsAction() } bind CallbackAction::class
     single { ResetProgressAction() } bind CallbackAction::class
     single { ConfirmResetAction(get(), get(), get(), get(), get()) } bind CallbackAction::class

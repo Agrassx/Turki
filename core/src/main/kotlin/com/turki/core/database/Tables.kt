@@ -115,6 +115,8 @@ object ReviewCardsTable : LongIdTable("$APP_SCHEMA.review_cards") {
     val stage = integer("stage").default(0)
     val nextReviewAt = timestamp("next_review_at")
     val lastResult = bool("last_result").nullable()
+    val correctCount = integer("correct_count").default(0)
+    val totalAttempts = integer("total_attempts").default(0)
     init {
         uniqueIndex(userId, vocabularyId)
     }

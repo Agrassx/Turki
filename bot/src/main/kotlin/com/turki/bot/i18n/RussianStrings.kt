@@ -481,6 +481,21 @@ $details
     override val weeklyReportsStatusOn = "📈 Недельные отчёты: включены"
     override val weeklyReportsStatusOff = "📈 Недельные отчёты: выключены"
 
+    // Word stats
+    override val btnWordStats = "📊 Статистика по словам"
+    override val wordStatsTitle = "📊 <b>Статистика по словам</b>"
+    override val wordStatsEmpty = "Пока нет данных. Пройдите повторение или урок, чтобы статистика появилась."
+    override val wordStatsWellKnown = "✅ <b>Хорошо запомнили:</b>"
+    override val wordStatsMedium = "🔶 <b>Средне:</b>"
+    override val wordStatsPoorlyKnown = "❌ <b>Нужно повторить:</b>"
+    override fun wordStatsItem(word: String, translation: String, accuracy: Int) =
+        "• <b>$word</b> — $translation ($accuracy%)"
+    override fun wordStatsSummary(total: Int, wellKnown: Int, medium: Int, poor: Int) = """
+
+📈 Всего слов: $total
+✅ Хорошо: $wellKnown | 🔶 Средне: $medium | ❌ Слабо: $poor
+    """.trim()
+
     // Support
     override val supportPrompt = """
 📬 <b>Служба поддержки</b>

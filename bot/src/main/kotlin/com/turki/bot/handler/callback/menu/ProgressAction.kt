@@ -41,7 +41,10 @@ class ProgressAction(
             query,
             progressText,
             replyMarkup = InlineKeyboardMarkup(
-                listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
+                listOf(
+                    listOf(dataInlineButton(S.btnWordStats, "word_stats")),
+                    listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
+                )
             )
         )
         analyticsService.log(EventNames.PROGRESS_VIEWED, user.id)

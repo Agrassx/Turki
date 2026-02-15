@@ -198,6 +198,16 @@ interface Strings {
     val weeklyReportsStatusOn: String
     val weeklyReportsStatusOff: String
 
+    // Word stats
+    val btnWordStats: String
+    val wordStatsTitle: String
+    val wordStatsEmpty: String
+    val wordStatsWellKnown: String
+    val wordStatsMedium: String
+    val wordStatsPoorlyKnown: String
+    fun wordStatsItem(word: String, translation: String, accuracy: Int): String
+    fun wordStatsSummary(total: Int, wellKnown: Int, medium: Int, poor: Int): String
+
     // Support
     val supportPrompt: String
     val supportSent: String
