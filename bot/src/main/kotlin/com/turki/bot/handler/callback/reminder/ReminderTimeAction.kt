@@ -37,9 +37,10 @@ class ReminderTimeAction(
             props = mapOf("schedule" to "${pref.daysOfWeek} ${pref.timeLocal}")
         )
 
+        val nextReminder = nextReminderDescription(pref.daysOfWeek, pref.timeLocal, user.timezone)
         context.editOrSendHtml(
             query,
-            S.reminderEnabled(formatDaysForDisplay(pref.daysOfWeek), pref.timeLocal),
+            S.reminderEnabled(formatDaysForDisplay(pref.daysOfWeek), pref.timeLocal, nextReminder),
             replyMarkup = InlineKeyboardMarkup(
                 listOf(listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")))
             )

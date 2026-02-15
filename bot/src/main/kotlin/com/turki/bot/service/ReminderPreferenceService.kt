@@ -26,7 +26,13 @@ class ReminderPreferenceService(
 
     suspend fun setSchedule(userId: Long, daysOfWeek: String, timeLocal: String): ReminderPreference {
         val current = getOrDefault(userId)
-        val next = current.copy(daysOfWeek = daysOfWeek, timeLocal = timeLocal, isEnabled = true)
+        // Set lastFiredAt to now so the scheduler won't fire immediately in the current hour
+        val next = current.copy(
+            daysOfWeek = daysOfWeek,
+            timeLocal = timeLocal,
+            isEnabled = true,
+            lastFiredAt = clock.now()
+        )
         return reminderPreferenceRepository.upsert(next)
     }
 

@@ -9,8 +9,10 @@ import com.turki.bot.service.ReminderService
 import com.turki.bot.service.UserService
 import com.turki.core.domain.ReminderType
 import dev.inmo.tgbotapi.bot.TelegramBot
+import dev.inmo.tgbotapi.extensions.api.deleteMessage
 import dev.inmo.tgbotapi.extensions.api.send.sendMessage
 import dev.inmo.tgbotapi.types.ChatId
+import dev.inmo.tgbotapi.types.MessageId
 import dev.inmo.tgbotapi.types.RawChatId
 import dev.inmo.tgbotapi.types.buttons.InlineKeyboardMarkup
 import dev.inmo.tgbotapi.types.buttons.inline.dataInlineButton
@@ -22,6 +24,7 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.coroutines.delay
 import org.koin.java.KoinJavaComponent.inject
 import org.slf4j.LoggerFactory
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.minutes
 
 private val logger = LoggerFactory.getLogger("ReminderScheduler")
@@ -29,12 +32,44 @@ private val logger = LoggerFactory.getLogger("ReminderScheduler")
 /** Hour (in user's local time) at which weekly reports are sent. */
 private const val WEEKLY_REPORT_HOUR = 9
 
+/** Tracks the last scheduler-sent message per user to delete it before sending a new one. */
+private val lastSchedulerMessage = ConcurrentHashMap<Long, Long>() // telegramId -> messageId
+
 private val reminderService: ReminderService by inject(ReminderService::class.java)
 private val userService: UserService by inject(UserService::class.java)
 private val reminderPreferenceService: ReminderPreferenceService by inject(ReminderPreferenceService::class.java)
 private val progressService: ProgressService by inject(ProgressService::class.java)
 private val analyticsService: AnalyticsService by inject(AnalyticsService::class.java)
 private val errorNotifierScheduler: ErrorNotifierService by inject(ErrorNotifierService::class.java)
+
+/**
+ * Sends a scheduler message to the user, deleting the previous scheduler message if any.
+ */
+private suspend fun sendSchedulerMessage(
+    bot: TelegramBot,
+    telegramId: Long,
+    text: String,
+    replyMarkup: InlineKeyboardMarkup
+) {
+    val chatId = ChatId(RawChatId(telegramId))
+
+    // Try to delete the previous scheduler message
+    lastSchedulerMessage[telegramId]?.let { oldMsgId ->
+        try {
+            bot.deleteMessage(chatId, MessageId(oldMsgId))
+        } catch (_: Exception) {
+            // Message may already be deleted or too old — ignore
+        }
+    }
+
+    val sent = bot.sendMessage(
+        chatId = chatId,
+        text = text,
+        parseMode = HTMLParseMode,
+        replyMarkup = replyMarkup
+    )
+    lastSchedulerMessage[telegramId] = sent.messageId.long
+}
 
 /**
  * Inline keyboard with action buttons for daily reminders.
@@ -87,11 +122,8 @@ suspend fun startReminderScheduler(
                 }
 
                 try {
-                    bot.sendMessage(
-                        chatId = ChatId(RawChatId(user.telegramId)),
-                        text = message,
-                        parseMode = HTMLParseMode,
-                        replyMarkup = reminderButtons(user.currentLessonId)
+                    sendSchedulerMessage(
+                        bot, user.telegramId, message, reminderButtons(user.currentLessonId)
                     )
                     reminderService.markReminderAsSent(reminder.id)
                 } catch (e: Exception) {
@@ -154,11 +186,8 @@ private suspend fun sendScheduledReminders(
             if (lastFired == local.date) return@forEach
 
             matched++
-            bot.sendMessage(
-                chatId = ChatId(RawChatId(user.telegramId)),
-                text = S.reminderLesson,
-                parseMode = HTMLParseMode,
-                replyMarkup = reminderButtons(user.currentLessonId)
+            sendSchedulerMessage(
+                bot, user.telegramId, S.reminderLesson, reminderButtons(user.currentLessonId)
             )
             reminderPreferenceService.markFired(user.id)
             analyticsService.log("reminder_fired", user.id)
@@ -214,11 +243,8 @@ private suspend fun sendWeeklyReports(
                 review = stats.weeklyReview,
                 homework = stats.weeklyHomework
             )
-            bot.sendMessage(
-                chatId = ChatId(RawChatId(user.telegramId)),
-                text = report,
-                parseMode = HTMLParseMode,
-                replyMarkup = weeklyReportButtons(user.currentLessonId)
+            sendSchedulerMessage(
+                bot, user.telegramId, report, weeklyReportButtons(user.currentLessonId)
             )
             progressService.resetWeekly(user.id)
             analyticsService.log("weekly_report_sent", user.id)

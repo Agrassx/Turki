@@ -90,7 +90,7 @@ interface Strings {
     fun dictionaryAddedAll(count: Int): String
     val reminderStatusOff: String
     fun reminderStatusOn(days: String, time: String): String
-    fun reminderEnabled(days: String, time: String): String
+    fun reminderEnabled(days: String, time: String, nextReminder: String): String
     val reminderDisabled: String
     val reminderSelectFrequency: String
     val reminderFrequencyDaily: String

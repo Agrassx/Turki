@@ -290,8 +290,10 @@ $details
     override fun reminderStatusOn(days: String, time: String) =
         "Напоминания включены: $days в $time"
 
-    override fun reminderEnabled(days: String, time: String) =
-        "Готово! Буду напоминать: $days в $time."
+    override fun reminderEnabled(days: String, time: String, nextReminder: String): String {
+        val next = if (nextReminder.isNotBlank()) "\n\n⏰ Ближайшее напоминание: $nextReminder" else ""
+        return "Готово! Буду напоминать: $days в $time.$next"
+    }
 
     override val reminderDisabled = "Ок, напоминания выключены."
 
