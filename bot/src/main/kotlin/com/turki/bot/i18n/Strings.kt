@@ -187,6 +187,17 @@ interface Strings {
     val learnChooseTurkish: String
     val learnChooseRussian: String
 
+    // Unsubscribe / subscribe notifications
+    val btnUnsubscribeWeekly: String
+    val btnUnsubscribeReminders: String
+    val btnResubscribeWeekly: String
+    val unsubscribedWeekly: String
+    val unsubscribedReminders: String
+    val resubscribedWeekly: String
+    val resubscribedReminders: String
+    val weeklyReportsStatusOn: String
+    val weeklyReportsStatusOff: String
+
     // Support
     val supportPrompt: String
     val supportSent: String

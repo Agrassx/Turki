@@ -10,5 +10,6 @@ data class UserStats(
     val weeklyPractice: Int,
     val weeklyReview: Int,
     val weeklyHomework: Int,
-    val lastWeeklyReportAt: Instant?
+    val lastWeeklyReportAt: Instant?,
+    val weeklyReportsEnabled: Boolean = true
 )

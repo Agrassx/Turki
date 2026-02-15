@@ -468,6 +468,17 @@ $details
     override val learnChooseTurkish = "🇹🇷 Выберите турецкое слово:"
     override val learnChooseRussian = "🇷🇺 Выберите русский перевод:"
 
+    // Unsubscribe / subscribe notifications
+    override val btnUnsubscribeWeekly = "🔕 Отключить недельные отчёты"
+    override val btnUnsubscribeReminders = "🔕 Отключить напоминания"
+    override val btnResubscribeWeekly = "🔔 Включить недельные отчёты"
+    override val unsubscribedWeekly = "✅ Недельные отчёты отключены. Включить обратно можно в настройках напоминаний."
+    override val unsubscribedReminders = "✅ Напоминания отключены. Включить обратно можно в настройках напоминаний."
+    override val resubscribedWeekly = "✅ Недельные отчёты снова включены!"
+    override val resubscribedReminders = "✅ Напоминания снова включены!"
+    override val weeklyReportsStatusOn = "📈 Недельные отчёты: включены"
+    override val weeklyReportsStatusOff = "📈 Недельные отчёты: выключены"
+
     // Support
     override val supportPrompt = """
 📬 <b>Служба поддержки</b>

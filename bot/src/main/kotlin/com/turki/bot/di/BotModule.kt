@@ -44,6 +44,9 @@ import com.turki.bot.handler.callback.reminder.ReminderFrequencyAction
 import com.turki.bot.handler.callback.reminder.ReminderTimeAction
 import com.turki.bot.handler.callback.reminder.RemindersAction
 import com.turki.bot.handler.callback.reminder.SetReminderAction
+import com.turki.bot.handler.callback.reminder.ResubscribeWeeklyAction
+import com.turki.bot.handler.callback.reminder.UnsubscribeRemindersAction
+import com.turki.bot.handler.callback.reminder.UnsubscribeWeeklyAction
 import com.turki.bot.handler.callback.review.ReviewAnswerAction
 import com.turki.bot.handler.callback.review.ReviewDifficultyAction
 import com.turki.bot.handler.callback.review.ReviewSessionAnswerAction
@@ -188,13 +191,16 @@ val botModule = module {
     single { ReviewSessionNextAction(get(), get()) } bind CallbackAction::class
     single { ReviewAnswerAction(get(), get(), get(), get(), get(), get()) } bind CallbackAction::class
     single { SetReminderAction(get(), get()) } bind CallbackAction::class
-    single { RemindersAction(get(), get()) } bind CallbackAction::class
+    single { RemindersAction(get(), get(), get()) } bind CallbackAction::class
     single { ReminderFrequencyAction(get(), get()) } bind CallbackAction::class
     single { ReminderDayToggleAction() } bind CallbackAction::class
     single { ReminderDaysConfirmAction() } bind CallbackAction::class
     single { ReminderTimeAction(get(), get(), get()) } bind CallbackAction::class
     single { ReminderEnableWeekdaysAction(get(), get(), get()) } bind CallbackAction::class
     single { ReminderDisableAction(get(), get()) } bind CallbackAction::class
+    single { UnsubscribeWeeklyAction(get(), get()) } bind CallbackAction::class
+    single { UnsubscribeRemindersAction(get(), get()) } bind CallbackAction::class
+    single { ResubscribeWeeklyAction(get(), get()) } bind CallbackAction::class
     single { ExerciseAnswerAction(get(), get(), get()) } bind CallbackAction::class
     single { ExerciseAddDictAction(get(), get(), get(), get(), get(), get()) } bind CallbackAction::class
     single { ExerciseNextAction(get(), get(), get(), get(), get()) } bind CallbackAction::class

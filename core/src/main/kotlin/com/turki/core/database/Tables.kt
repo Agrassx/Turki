@@ -145,6 +145,7 @@ object UserStatsTable : LongIdTable("$APP_SCHEMA.user_stats") {
     val weeklyReview = integer("weekly_review").default(0)
     val weeklyHomework = integer("weekly_homework").default(0)
     val lastWeeklyReportAt = timestamp("last_weekly_report_at").nullable()
+    val weeklyReportsEnabled = bool("weekly_reports_enabled").default(true)
 }
 
 // Subscription system tables

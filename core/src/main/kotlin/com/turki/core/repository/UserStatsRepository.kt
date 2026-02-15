@@ -6,5 +6,6 @@ interface UserStatsRepository {
     suspend fun findByUserId(userId: Long): UserStats?
     suspend fun upsert(stats: UserStats): UserStats
     suspend fun resetWeekly(userId: Long): Boolean
+    suspend fun setWeeklyReportsEnabled(userId: Long, enabled: Boolean): Boolean
     suspend fun deleteByUser(userId: Long): Boolean
 }

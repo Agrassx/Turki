@@ -77,8 +77,15 @@ internal suspend fun showTimeSelection(
 internal suspend fun renderRemindersMenu(
     context: BehaviourContext,
     query: DataCallbackQuery,
-    status: String
+    status: String,
+    weeklyReportsEnabled: Boolean = true
 ) {
+    val weeklyButton = if (weeklyReportsEnabled) {
+        dataInlineButton(S.btnUnsubscribeWeekly, "unsub_weekly")
+    } else {
+        dataInlineButton(S.btnResubscribeWeekly, "resub_weekly")
+    }
+
     context.editOrSendHtml(
         query,
         status,
@@ -87,6 +94,7 @@ internal suspend fun renderRemindersMenu(
                 listOf(dataInlineButton(S.btnConfigureReminders, "reminder_frequency:menu")),
                 listOf(dataInlineButton(S.btnEnableWeekdays, "reminder_enable_weekdays")),
                 listOf(dataInlineButton(S.btnDisableReminders, "reminder_disable")),
+                listOf(weeklyButton),
                 listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
             )
         )

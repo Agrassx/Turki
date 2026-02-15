@@ -37,9 +37,9 @@ private val analyticsService: AnalyticsService by inject(AnalyticsService::class
 private val errorNotifierScheduler: ErrorNotifierService by inject(ErrorNotifierService::class.java)
 
 /**
- * Inline keyboard with action buttons for proactive messages (reminders, reports).
+ * Inline keyboard with action buttons for daily reminders.
  */
-private fun actionButtons(lessonId: Int) = InlineKeyboardMarkup(
+private fun reminderButtons(lessonId: Int) = InlineKeyboardMarkup(
     listOf(
         listOf(dataInlineButton(S.btnContinueLesson, "lesson_start:$lessonId")),
         listOf(
@@ -47,7 +47,24 @@ private fun actionButtons(lessonId: Int) = InlineKeyboardMarkup(
             dataInlineButton(S.btnHomework, "homework:$lessonId")
         ),
         listOf(dataInlineButton(S.btnLearnWords, "learn_words")),
-        listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
+        listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")),
+        listOf(dataInlineButton(S.btnUnsubscribeReminders, "unsub_reminders"))
+    )
+)
+
+/**
+ * Inline keyboard with action buttons for weekly reports.
+ */
+private fun weeklyReportButtons(lessonId: Int) = InlineKeyboardMarkup(
+    listOf(
+        listOf(dataInlineButton(S.btnContinueLesson, "lesson_start:$lessonId")),
+        listOf(
+            dataInlineButton(S.btnPractice, "practice_start"),
+            dataInlineButton(S.btnHomework, "homework:$lessonId")
+        ),
+        listOf(dataInlineButton(S.btnLearnWords, "learn_words")),
+        listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu")),
+        listOf(dataInlineButton(S.btnUnsubscribeWeekly, "unsub_weekly"))
     )
 )
 
@@ -74,7 +91,7 @@ suspend fun startReminderScheduler(
                         chatId = ChatId(RawChatId(user.telegramId)),
                         text = message,
                         parseMode = HTMLParseMode,
-                        replyMarkup = actionButtons(user.currentLessonId)
+                        replyMarkup = reminderButtons(user.currentLessonId)
                     )
                     reminderService.markReminderAsSent(reminder.id)
                 } catch (e: Exception) {
@@ -141,7 +158,7 @@ private suspend fun sendScheduledReminders(
                 chatId = ChatId(RawChatId(user.telegramId)),
                 text = S.reminderLesson,
                 parseMode = HTMLParseMode,
-                replyMarkup = actionButtons(user.currentLessonId)
+                replyMarkup = reminderButtons(user.currentLessonId)
             )
             reminderPreferenceService.markFired(user.id)
             analyticsService.log("reminder_fired", user.id)
@@ -176,6 +193,12 @@ private suspend fun sendWeeklyReports(
             val lastReportDate = stats.lastWeeklyReportAt?.toLocalDateTime(userTz)?.date
             if (lastReportDate == local.date) return@forEach
 
+            // User opted out of weekly reports
+            if (!stats.weeklyReportsEnabled) {
+                progressService.resetWeekly(user.id)
+                return@forEach
+            }
+
             // Don't send a report if the user had zero activity this week
             val totalActivity = stats.weeklyLessons + stats.weeklyPractice +
                 stats.weeklyReview + stats.weeklyHomework
@@ -195,7 +218,7 @@ private suspend fun sendWeeklyReports(
                 chatId = ChatId(RawChatId(user.telegramId)),
                 text = report,
                 parseMode = HTMLParseMode,
-                replyMarkup = actionButtons(user.currentLessonId)
+                replyMarkup = weeklyReportButtons(user.currentLessonId)
             )
             progressService.resetWeekly(user.id)
             analyticsService.log("weekly_report_sent", user.id)

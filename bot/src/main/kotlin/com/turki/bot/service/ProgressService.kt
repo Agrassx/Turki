@@ -112,6 +112,10 @@ class ProgressService(
         userStatsRepository.resetWeekly(userId)
     }
 
+    suspend fun setWeeklyReportsEnabled(userId: Long, enabled: Boolean) {
+        userStatsRepository.setWeeklyReportsEnabled(userId, enabled)
+    }
+
     private suspend fun touchStats(userId: Long, update: (UserStats) -> UserStats) {
         val now = clock.now()
         val existing = userStatsRepository.findByUserId(userId)

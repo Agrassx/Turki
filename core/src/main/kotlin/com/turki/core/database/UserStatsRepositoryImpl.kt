@@ -28,6 +28,7 @@ class UserStatsRepositoryImpl(
             it[weeklyReview] = stats.weeklyReview
             it[weeklyHomework] = stats.weeklyHomework
             it[lastWeeklyReportAt] = stats.lastWeeklyReportAt
+            it[weeklyReportsEnabled] = stats.weeklyReportsEnabled
         }
 
         if (updated == 0) {
@@ -40,6 +41,7 @@ class UserStatsRepositoryImpl(
                 it[weeklyReview] = stats.weeklyReview
                 it[weeklyHomework] = stats.weeklyHomework
                 it[lastWeeklyReportAt] = stats.lastWeeklyReportAt
+                it[weeklyReportsEnabled] = stats.weeklyReportsEnabled
             }
         }
 
@@ -70,6 +72,27 @@ class UserStatsRepositoryImpl(
         true
     }
 
+    override suspend fun setWeeklyReportsEnabled(userId: Long, enabled: Boolean): Boolean =
+        DatabaseFactory.dbQuery {
+            val updated = UserStatsTable.update({ UserStatsTable.userId eq userId }) {
+                it[weeklyReportsEnabled] = enabled
+            }
+            if (updated == 0) {
+                UserStatsTable.insert {
+                    it[UserStatsTable.userId] = userId
+                    it[currentStreak] = 0
+                    it[lastActiveAt] = null
+                    it[weeklyLessons] = 0
+                    it[weeklyPractice] = 0
+                    it[weeklyReview] = 0
+                    it[weeklyHomework] = 0
+                    it[lastWeeklyReportAt] = null
+                    it[weeklyReportsEnabled] = enabled
+                }
+            }
+            true
+        }
+
     override suspend fun deleteByUser(userId: Long): Boolean = DatabaseFactory.dbQuery {
         UserStatsTable.deleteWhere { UserStatsTable.userId eq userId } > 0
     }
@@ -82,6 +105,7 @@ class UserStatsRepositoryImpl(
         weeklyPractice = row[UserStatsTable.weeklyPractice],
         weeklyReview = row[UserStatsTable.weeklyReview],
         weeklyHomework = row[UserStatsTable.weeklyHomework],
-        lastWeeklyReportAt = row[UserStatsTable.lastWeeklyReportAt]
+        lastWeeklyReportAt = row[UserStatsTable.lastWeeklyReportAt],
+        weeklyReportsEnabled = row[UserStatsTable.weeklyReportsEnabled]
     )
 }
