@@ -176,6 +176,15 @@ private suspend fun sendWeeklyReports(
             val lastReportDate = stats.lastWeeklyReportAt?.toLocalDateTime(userTz)?.date
             if (lastReportDate == local.date) return@forEach
 
+            // Don't send a report if the user had zero activity this week
+            val totalActivity = stats.weeklyLessons + stats.weeklyPractice +
+                stats.weeklyReview + stats.weeklyHomework
+            if (totalActivity == 0) {
+                // Still reset so lastWeeklyReportAt is set (avoids re-checking every minute)
+                progressService.resetWeekly(user.id)
+                return@forEach
+            }
+
             val report = S.weeklyReport(
                 lessons = stats.weeklyLessons,
                 practice = stats.weeklyPractice,
