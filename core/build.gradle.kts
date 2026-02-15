@@ -8,6 +8,8 @@ dependencies {
     api(libs.bundles.kotlin.common)
     api(libs.bundles.exposed)
     api(libs.postgresql.jdbc)
+    api(libs.flyway.core)
+    api(libs.flyway.postgresql)
     implementation(libs.koin.core)
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlin.test.junit5)

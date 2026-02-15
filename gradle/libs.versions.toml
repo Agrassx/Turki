@@ -13,6 +13,7 @@ koin = "4.0.2"
 logback = "1.5.15"
 detekt = "1.23.8"
 datetime = "0.6.2"
+flyway = "11.3.0"
 quartz = "2.5.0"
 junit = "5.10.2"
 mockk = "1.13.12"
@@ -47,6 +48,8 @@ exposed-datetime = { module = "org.jetbrains.exposed:exposed-kotlin-datetime", v
 h2-database = { module = "com.h2database:h2", version.ref = "h2" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite" }
 postgresql-jdbc = { module = "org.postgresql:postgresql", version.ref = "postgres" }
+flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
+flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
 
 # Telegram Bot
 telegram-bot = { module = "dev.inmo:tgbotapi", version.ref = "telegramBot" }
