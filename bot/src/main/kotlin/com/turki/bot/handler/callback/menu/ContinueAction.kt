@@ -3,11 +3,13 @@ package com.turki.bot.handler.callback.menu
 import com.turki.bot.handler.callback.CALLBACK_JSON
 import com.turki.bot.handler.callback.CallbackAction
 import com.turki.bot.handler.callback.exercise.sendExercise
+import com.turki.bot.handler.callback.learn.sendLearnQuestion
 import com.turki.bot.handler.callback.review.sendReviewCard
 import com.turki.bot.handler.callback.review.sendReviewSessionQuestion
 import com.turki.bot.i18n.S
 import com.turki.bot.service.AnalyticsService
 import com.turki.bot.service.ExerciseFlowPayload
+import com.turki.bot.service.LearnSessionPayload
 import com.turki.bot.service.LessonService
 import com.turki.bot.service.ReviewFlowPayload
 import com.turki.bot.service.ReviewSessionPayload
@@ -60,6 +62,10 @@ class ContinueAction(
                     val payload = CALLBACK_JSON.decodeFromString<ReviewFlowPayload>(state.payload)
                     sendReviewCard(context, query, payload, lessonService)
                 }
+            }
+            UserFlowState.LEARN_WORDS.name -> {
+                val payload = CALLBACK_JSON.decodeFromString<LearnSessionPayload>(state.payload)
+                sendLearnQuestion(context, query, payload)
             }
             UserFlowState.DICT_SEARCH.name -> {
                 context.sendHtml(query.from, S.dictionaryPrompt)

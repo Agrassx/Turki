@@ -135,6 +135,12 @@ class HomeworkService(
     suspend fun createHomework(homework: Homework): Homework =
         homeworkRepository.create(homework)
 
+    /**
+     * Deletes homework and questions for a lesson (used during content updates).
+     */
+    suspend fun deleteByLessonId(lessonId: Int): Boolean =
+        homeworkRepository.deleteByLessonId(lessonId)
+
     fun isAnswerCorrect(question: HomeworkQuestion, answer: String?): Boolean {
         if (answer.isNullOrBlank()) {
             return false

@@ -450,6 +450,24 @@ $details
 Продлите подписку, чтобы продолжить обучение.
     """.trim()
 
+    // Learn words
+    override val btnLearnWords = "🧠 Учить новые слова"
+    override val learnWordsIntro = """
+🧠 <b>Учить новые слова</b>
+
+Выберите сложность:
+    """.trim()
+    override val learnWordsEmpty = "Пока нет новых слов для изучения. Пройдите больше уроков!"
+    override val learnWordsDone = "🎉 <b>Отлично!</b>\n\nВы выучили все слова в этом занятии!"
+    override val learnDifficultyEasy = "☕ Лёгкий (5 слов)"
+    override val learnDifficultyMedium = "💪 Средний (10 слов)"
+    override val learnDifficultyHard = "🔥 Сложный (15 слов)"
+    override fun learnWordsProgress(current: Int, total: Int) = "Вопрос $current из $total"
+    override val learnTranslateToTurkish = "🇹🇷 Как переводится на турецкий?"
+    override val learnTranslateToRussian = "🇷🇺 Что означает это слово?"
+    override val learnChooseTurkish = "🇹🇷 Выберите турецкое слово:"
+    override val learnChooseRussian = "🇷🇺 Выберите русский перевод:"
+
     // Support
     override val supportPrompt = """
 📬 <b>Служба поддержки</b>

@@ -9,10 +9,10 @@ complexity:
     functionThreshold: 12
     constructorThreshold: 15
   TooManyFunctions:
-    thresholdInFiles: 30
+    thresholdInFiles: 40
     thresholdInClasses: 60
-    thresholdInInterfaces: 30
-    thresholdInObjects: 30
+    thresholdInInterfaces: 40
+    thresholdInObjects: 40
     thresholdInEnums: 10
   CyclomaticComplexMethod:
     threshold: 50

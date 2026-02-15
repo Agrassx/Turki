@@ -96,4 +96,10 @@ interface LessonRepository {
      * @return true if the lesson was deleted, false otherwise
      */
     suspend fun delete(id: Int): Boolean
+
+    /**
+     * Replaces all vocabulary items for a lesson.
+     * Deletes existing items and inserts the new ones.
+     */
+    suspend fun replaceVocabulary(lessonId: Int, items: List<VocabularyItem>)
 }

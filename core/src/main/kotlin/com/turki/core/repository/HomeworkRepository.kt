@@ -81,4 +81,10 @@ interface HomeworkRepository {
      * @return true if any submissions were deleted, false otherwise
      */
     suspend fun deleteSubmissionsByUser(userId: Long): Boolean
+
+    /**
+     * Deletes homework and its questions for a specific lesson.
+     * Does NOT delete user submissions.
+     */
+    suspend fun deleteByLessonId(lessonId: Int): Boolean
 }

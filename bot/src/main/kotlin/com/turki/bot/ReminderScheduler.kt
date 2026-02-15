@@ -12,6 +12,8 @@ import dev.inmo.tgbotapi.bot.TelegramBot
 import dev.inmo.tgbotapi.extensions.api.send.sendMessage
 import dev.inmo.tgbotapi.types.ChatId
 import dev.inmo.tgbotapi.types.RawChatId
+import dev.inmo.tgbotapi.types.buttons.InlineKeyboardMarkup
+import dev.inmo.tgbotapi.types.buttons.inline.dataInlineButton
 import dev.inmo.tgbotapi.types.message.HTMLParseMode
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DayOfWeek
@@ -24,12 +26,30 @@ import kotlin.time.Duration.Companion.minutes
 
 private val logger = LoggerFactory.getLogger("ReminderScheduler")
 
+/** Hour (in user's local time) at which weekly reports are sent. */
+private const val WEEKLY_REPORT_HOUR = 9
+
 private val reminderService: ReminderService by inject(ReminderService::class.java)
 private val userService: UserService by inject(UserService::class.java)
 private val reminderPreferenceService: ReminderPreferenceService by inject(ReminderPreferenceService::class.java)
 private val progressService: ProgressService by inject(ProgressService::class.java)
 private val analyticsService: AnalyticsService by inject(AnalyticsService::class.java)
 private val errorNotifierScheduler: ErrorNotifierService by inject(ErrorNotifierService::class.java)
+
+/**
+ * Inline keyboard with action buttons for proactive messages (reminders, reports).
+ */
+private fun actionButtons(lessonId: Int) = InlineKeyboardMarkup(
+    listOf(
+        listOf(dataInlineButton(S.btnContinueLesson, "lesson_start:$lessonId")),
+        listOf(
+            dataInlineButton(S.btnPractice, "practice_start"),
+            dataInlineButton(S.btnHomework, "homework:$lessonId")
+        ),
+        listOf(dataInlineButton(S.btnLearnWords, "learn_words")),
+        listOf(dataInlineButton(S.btnBackToMenu, "back_to_menu"))
+    )
+)
 
 suspend fun startReminderScheduler(
     bot: TelegramBot,
@@ -53,7 +73,8 @@ suspend fun startReminderScheduler(
                     bot.sendMessage(
                         chatId = ChatId(RawChatId(user.telegramId)),
                         text = message,
-                        parseMode = HTMLParseMode
+                        parseMode = HTMLParseMode,
+                        replyMarkup = actionButtons(user.currentLessonId)
                     )
                     reminderService.markReminderAsSent(reminder.id)
                 } catch (e: Exception) {
@@ -88,55 +109,71 @@ private val dayCodeToEnum = mapOf(
 private suspend fun sendScheduledReminders(
     bot: TelegramBot,
     clock: Clock,
-    timeZone: TimeZone
+    @Suppress("UNUSED_PARAMETER") timeZone: TimeZone
 ) {
     val users = userService.getAllUsers()
     val now = clock.now()
-    val local = now.toLocalDateTime(timeZone)
-    val currentDay = local.date.dayOfWeek
-    val currentTime = "%02d:%02d".format(local.hour, local.minute)
 
+    var matched = 0
+    var sent = 0
     users.forEach { user ->
         try {
+            val userTz = try { TimeZone.of(user.timezone) } catch (_: Exception) { TimeZone.of("Europe/Moscow") }
+            val local = now.toLocalDateTime(userTz)
+            val currentDay = local.date.dayOfWeek
+            val currentHour = local.hour
+
             val pref = reminderPreferenceService.getOrDefault(user.id)
             if (!pref.isEnabled) return@forEach
 
             val activeDays = pref.daysOfWeek.split(",").mapNotNull { dayCodeToEnum[it.trim()] }
             if (currentDay !in activeDays) return@forEach
-            if (pref.timeLocal != currentTime) return@forEach
 
-            val lastFired = pref.lastFiredAt?.toLocalDateTime(timeZone)?.date
+            // Match by hour instead of exact minute to avoid skips
+            val prefHour = pref.timeLocal.substringBefore(":").toIntOrNull() ?: return@forEach
+            if (currentHour != prefHour) return@forEach
+
+            val lastFired = pref.lastFiredAt?.toLocalDateTime(userTz)?.date
             if (lastFired == local.date) return@forEach
 
+            matched++
             bot.sendMessage(
                 chatId = ChatId(RawChatId(user.telegramId)),
                 text = S.reminderLesson,
-                parseMode = HTMLParseMode
+                parseMode = HTMLParseMode,
+                replyMarkup = actionButtons(user.currentLessonId)
             )
             reminderPreferenceService.markFired(user.id)
             analyticsService.log("reminder_fired", user.id)
+            sent++
         } catch (e: Exception) {
             logger.warn("Failed to send scheduled reminder to userId=${user.id}: ${e.message}")
         }
+    }
+
+    if (matched > 0) {
+        logger.info("Scheduled reminders: matched={}, sent={}", matched, sent)
     }
 }
 
 private suspend fun sendWeeklyReports(
     bot: TelegramBot,
     clock: Clock,
-    timeZone: TimeZone
+    @Suppress("UNUSED_PARAMETER") timeZone: TimeZone
 ) {
     val users = userService.getAllUsers()
     val now = clock.now()
-    val local = now.toLocalDateTime(timeZone)
-    if (local.date.dayOfWeek != DayOfWeek.SUNDAY) {
-        return
-    }
 
     users.forEach { user ->
         try {
+            val userTz = try { TimeZone.of(user.timezone) } catch (_: Exception) { TimeZone.of("Europe/Moscow") }
+            val local = now.toLocalDateTime(userTz)
+
+            if (local.date.dayOfWeek != DayOfWeek.SUNDAY) return@forEach
+            if (local.hour < WEEKLY_REPORT_HOUR) return@forEach
+
             val stats = progressService.getWeeklyStats(user.id)
-            val lastReportDate = stats.lastWeeklyReportAt?.toLocalDateTime(timeZone)?.date
+            val lastReportDate = stats.lastWeeklyReportAt?.toLocalDateTime(userTz)?.date
             if (lastReportDate == local.date) return@forEach
 
             val report = S.weeklyReport(
@@ -148,7 +185,8 @@ private suspend fun sendWeeklyReports(
             bot.sendMessage(
                 chatId = ChatId(RawChatId(user.telegramId)),
                 text = report,
-                parseMode = HTMLParseMode
+                parseMode = HTMLParseMode,
+                replyMarkup = actionButtons(user.currentLessonId)
             )
             progressService.resetWeekly(user.id)
             analyticsService.log("weekly_report_sent", user.id)

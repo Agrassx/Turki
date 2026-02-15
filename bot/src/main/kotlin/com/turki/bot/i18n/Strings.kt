@@ -173,6 +173,20 @@ interface Strings {
     val reminderHomework: String
     val reminderSubscription: String
 
+    // Learn words
+    val btnLearnWords: String
+    val learnWordsIntro: String
+    val learnWordsEmpty: String
+    val learnWordsDone: String
+    val learnDifficultyEasy: String
+    val learnDifficultyMedium: String
+    val learnDifficultyHard: String
+    fun learnWordsProgress(current: Int, total: Int): String
+    val learnTranslateToTurkish: String
+    val learnTranslateToRussian: String
+    val learnChooseTurkish: String
+    val learnChooseRussian: String
+
     // Support
     val supportPrompt: String
     val supportSent: String

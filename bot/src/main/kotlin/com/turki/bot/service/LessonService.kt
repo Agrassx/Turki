@@ -75,4 +75,13 @@ class LessonService(private val lessonRepository: LessonRepository) {
      * @return The created [Lesson] with assigned database ID
      */
     suspend fun createLesson(lesson: Lesson): Lesson = lessonRepository.create(lesson)
+
+    /**
+     * Updates an existing lesson's content, metadata, and vocabulary.
+     */
+    suspend fun updateLesson(lesson: Lesson): Lesson {
+        val updated = lessonRepository.update(lesson)
+        lessonRepository.replaceVocabulary(lesson.id, lesson.vocabularyItems)
+        return updated
+    }
 }

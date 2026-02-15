@@ -11,6 +11,7 @@ data class User(
     val firstName: String,
     val lastName: String?,
     val language: Language = Language.RUSSIAN,
+    val timezone: String = "Europe/Moscow",
     val subscriptionActive: Boolean = false,
     val subscriptionExpiresAt: Instant? = null,
     val currentLessonId: Int = 1,

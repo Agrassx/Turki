@@ -24,6 +24,7 @@ internal suspend fun renderMainMenu(
         addAll(
             listOf(
                 listOf(dataInlineButton(S.btnLessons, "lessons_list")),
+                listOf(dataInlineButton(S.btnLearnWords, "learn_words")),
                 listOf(dataInlineButton(S.btnPractice, "practice_start")),
                 listOf(dataInlineButton(S.btnDictionary, "dictionary_prompt")),
                 listOf(dataInlineButton(S.btnReview, "review_start")),

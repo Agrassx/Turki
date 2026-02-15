@@ -14,6 +14,7 @@ object UsersTable : LongIdTable("$APP_SCHEMA.users") {
     val firstName = varchar("first_name", 255)
     val lastName = varchar("last_name", 255).nullable()
     val language = varchar("language", 10).default("ru")
+    val timezone = varchar("timezone", 64).default("Europe/Moscow")
     val subscriptionActive = bool("subscription_active").default(false)
     val subscriptionExpiresAt = timestamp("subscription_expires_at").nullable()
     val currentLessonId = integer("current_lesson_id").default(1)

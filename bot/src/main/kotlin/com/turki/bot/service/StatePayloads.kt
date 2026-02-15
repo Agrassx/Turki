@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 enum class UserFlowState {
     EXERCISE,
     REVIEW,
+    LEARN_WORDS,
     DICT_SEARCH,
     DICT_ADD_CUSTOM,
     HOMEWORK_TEXT,
@@ -72,4 +73,38 @@ enum class ReviewDifficulty(val questionCount: Int) {
 @Serializable
 data class DictionaryFlowPayload(
     val placeholder: String = "search"
+)
+
+// --- Learn words ---
+
+@Serializable
+enum class LearnDifficulty(val wordCount: Int) {
+    EASY(5),
+    MEDIUM(10),
+    HARD(15)
+}
+
+@Serializable
+enum class LearnQuestionType {
+    MCQ_RU_TO_TR,  // Show Russian, pick Turkish
+    MCQ_TR_TO_RU,  // Show Turkish, pick Russian
+    MCQ_CHOOSE_TR, // "Выберите турецкое слово для 'X'"
+    MCQ_CHOOSE_RU  // "Выберите русский перевод для 'X'"
+}
+
+@Serializable
+data class LearnQuestion(
+    val vocabularyId: Int,
+    val type: LearnQuestionType,
+    val questionText: String,
+    val correctAnswer: String,
+    val options: List<String>
+)
+
+@Serializable
+data class LearnSessionPayload(
+    val questions: List<LearnQuestion>,
+    val currentIndex: Int,
+    val correctCount: Int,
+    val difficulty: LearnDifficulty
 )

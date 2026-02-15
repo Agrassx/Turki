@@ -103,6 +103,10 @@ object EventNames {
     const val REVIEW_COMPLETED = "review_completed"
     const val REVIEW_QUESTION_ANSWERED = "review_question_answered"
 
+    // Learn words
+    const val LEARN_STARTED = "learn_started"
+    const val LEARN_COMPLETED = "learn_completed"
+
     // Dictionary
     const val WORD_ADDED_TO_DICTIONARY = "word_added_to_dictionary"
     const val WORD_ADDED = "word_added"

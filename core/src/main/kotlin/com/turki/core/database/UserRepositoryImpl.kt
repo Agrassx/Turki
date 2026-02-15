@@ -47,6 +47,7 @@ class UserRepositoryImpl(
             it[firstName] = user.firstName
             it[lastName] = user.lastName
             it[language] = user.language.code
+            it[timezone] = user.timezone
             it[subscriptionActive] = user.subscriptionActive
             it[subscriptionExpiresAt] = user.subscriptionExpiresAt
             it[currentLessonId] = user.currentLessonId
@@ -64,6 +65,7 @@ class UserRepositoryImpl(
             it[firstName] = user.firstName
             it[lastName] = user.lastName
             it[language] = user.language.code
+            it[timezone] = user.timezone
             it[subscriptionActive] = user.subscriptionActive
             it[subscriptionExpiresAt] = user.subscriptionExpiresAt
             it[currentLessonId] = user.currentLessonId
@@ -94,6 +96,13 @@ class UserRepositoryImpl(
     override suspend fun updateLanguage(userId: Long, language: Language): Boolean = DatabaseFactory.dbQuery {
         UsersTable.update({ UsersTable.id eq userId }) {
             it[UsersTable.language] = language.code
+            it[updatedAt] = clock.now()
+        } > 0
+    }
+
+    override suspend fun updateTimezone(userId: Long, timezone: String): Boolean = DatabaseFactory.dbQuery {
+        UsersTable.update({ UsersTable.id eq userId }) {
+            it[UsersTable.timezone] = timezone
             it[updatedAt] = clock.now()
         } > 0
     }
@@ -130,6 +139,7 @@ class UserRepositoryImpl(
         firstName = row[UsersTable.firstName],
         lastName = row[UsersTable.lastName],
         language = Language.fromCode(row[UsersTable.language]) ?: Language.RUSSIAN,
+        timezone = row[UsersTable.timezone],
         subscriptionActive = row[UsersTable.subscriptionActive],
         subscriptionExpiresAt = row[UsersTable.subscriptionExpiresAt],
         currentLessonId = row[UsersTable.currentLessonId],

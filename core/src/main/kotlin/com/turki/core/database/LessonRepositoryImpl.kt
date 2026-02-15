@@ -138,6 +138,19 @@ class LessonRepositoryImpl : LessonRepository {
         LessonsTable.deleteWhere { LessonsTable.id eq id } > 0
     }
 
+    override suspend fun replaceVocabulary(lessonId: Int, items: List<VocabularyItem>) = DatabaseFactory.dbQuery {
+        VocabularyTable.deleteWhere { VocabularyTable.lessonId eq lessonId }
+        items.forEach { vocab ->
+            VocabularyTable.insert {
+                it[VocabularyTable.lessonId] = lessonId
+                it[word] = vocab.word
+                it[translation] = vocab.translation
+                it[pronunciation] = vocab.pronunciation
+                it[example] = vocab.example
+            }
+        }
+    }
+
     private fun toLesson(row: ResultRow): Lesson = Lesson(
         id = row[LessonsTable.id].value,
         orderIndex = row[LessonsTable.orderIndex],

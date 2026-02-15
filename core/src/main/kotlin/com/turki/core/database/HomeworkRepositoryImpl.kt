@@ -127,6 +127,15 @@ class HomeworkRepositoryImpl : HomeworkRepository {
         }
     }
 
+    override suspend fun deleteByLessonId(lessonId: Int): Boolean = DatabaseFactory.dbQuery {
+        val homeworkRows = HomeworksTable.selectAll().where { HomeworksTable.lessonId eq lessonId }
+        val homeworkIds = homeworkRows.map { it[HomeworksTable.id].value }
+        homeworkIds.forEach { hwId ->
+            HomeworkQuestionsTable.deleteWhere { homeworkId eq hwId }
+        }
+        HomeworksTable.deleteWhere { HomeworksTable.lessonId eq lessonId } > 0
+    }
+
     private fun toSubmission(row: ResultRow): HomeworkSubmission = HomeworkSubmission(
         id = row[HomeworkSubmissionsTable.id].value,
         userId = row[HomeworkSubmissionsTable.userId].value,

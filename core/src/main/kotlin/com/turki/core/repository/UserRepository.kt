@@ -91,6 +91,15 @@ interface UserRepository {
     suspend fun updateLanguage(userId: Long, language: Language): Boolean
 
     /**
+     * Updates the user's timezone.
+     *
+     * @param userId The user's database ID
+     * @param timezone IANA timezone string (e.g. "Europe/Moscow")
+     * @return true if the update was successful, false otherwise
+     */
+    suspend fun updateTimezone(userId: Long, timezone: String): Boolean
+
+    /**
      * Deletes a user from the database.
      *
      * @param id The user's database ID

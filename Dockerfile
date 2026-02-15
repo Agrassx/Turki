@@ -25,6 +25,7 @@ RUN apk add --no-cache wget
 RUN mkdir -p /app/data
 
 COPY --from=build /app/bot/build/libs/*.jar /app/bot.jar
+COPY data/ /app/data/
 
 EXPOSE 8080
 

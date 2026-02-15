@@ -62,7 +62,7 @@ object ImportData {
      * ImportData.importAll("/absolute/path/to/data")
      * ```
      */
-    fun importAll(dataDir: String = "data") {
+    fun importAll(dataDir: String = "data", skipDbInit: Boolean = false) {
         println("🚀 Начинаем импорт данных...")
 
         val baseDir = findDataDir(dataDir)
@@ -77,8 +77,10 @@ object ImportData {
             return
         }
 
-        runBlocking {
-            DatabaseFactory.init()
+        if (!skipDbInit) {
+            runBlocking {
+                DatabaseFactory.init()
+            }
         }
 
         val lessonIdMap = mutableMapOf<Int, Int>()

@@ -48,6 +48,10 @@ import com.turki.bot.handler.callback.review.ReviewAnswerAction
 import com.turki.bot.handler.callback.review.ReviewDifficultyAction
 import com.turki.bot.handler.callback.review.ReviewSessionAnswerAction
 import com.turki.bot.handler.callback.review.ReviewSessionNextAction
+import com.turki.bot.handler.callback.learn.LearnAnswerAction
+import com.turki.bot.handler.callback.learn.LearnDifficultyAction
+import com.turki.bot.handler.callback.learn.LearnNextAction
+import com.turki.bot.handler.callback.learn.LearnWordsAction
 import com.turki.bot.handler.callback.review.ReviewStartAction
 import com.turki.bot.handler.callback.vocabulary.VocabAddAction
 import com.turki.bot.handler.callback.vocabulary.VocabAddAllAction
@@ -87,6 +91,7 @@ import com.turki.bot.service.ProgressService
 import com.turki.bot.service.ReminderPreferenceService
 import com.turki.bot.service.ReminderService
 import com.turki.bot.service.MetricsService
+import com.turki.bot.service.LearnWordsService
 import com.turki.bot.service.ReviewService
 import com.turki.bot.service.SupportService
 import com.turki.bot.service.UserDataService
@@ -98,7 +103,7 @@ import org.koin.dsl.bind
 import org.koin.dsl.module
 
 val botModule = module {
-    single { TimeZone.currentSystemDefault() }
+    single { TimeZone.of("Europe/Moscow") }
     single<Random> { Random.Default }
     single { UserService(get(), get()) }
     single { LessonService(get()) }
@@ -109,6 +114,7 @@ val botModule = module {
     single { ProgressService(get(), get(), get(), get(), get()) }
     single { DictionaryService(get(), get(), get(), get()) }
     single { ReviewService(get(), get(), get(), get(), get(), get(), get()) }
+    single { LearnWordsService(get(), get()) }
     single { ReminderPreferenceService(get(), get()) }
     single { AnalyticsService(get(), get()) }
     single { UserDataService(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
@@ -192,5 +198,9 @@ val botModule = module {
     single { ExerciseAnswerAction(get(), get(), get()) } bind CallbackAction::class
     single { ExerciseAddDictAction(get(), get(), get(), get(), get(), get()) } bind CallbackAction::class
     single { ExerciseNextAction(get(), get(), get(), get(), get()) } bind CallbackAction::class
+    single { LearnWordsAction(get()) } bind CallbackAction::class
+    single { LearnDifficultyAction(get(), get(), get(), get()) } bind CallbackAction::class
+    single { LearnAnswerAction(get(), get(), get(), get()) } bind CallbackAction::class
+    single { LearnNextAction(get(), get()) } bind CallbackAction::class
     single { CallbackHandler(getAll()) }
 }
