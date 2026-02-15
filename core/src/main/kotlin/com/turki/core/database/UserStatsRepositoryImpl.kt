@@ -47,13 +47,27 @@ class UserStatsRepositoryImpl(
     }
 
     override suspend fun resetWeekly(userId: Long): Boolean = DatabaseFactory.dbQuery {
-        UserStatsTable.update({ UserStatsTable.userId eq userId }) {
+        val now = clock.now()
+        val updated = UserStatsTable.update({ UserStatsTable.userId eq userId }) {
             it[weeklyLessons] = 0
             it[weeklyPractice] = 0
             it[weeklyReview] = 0
             it[weeklyHomework] = 0
-            it[lastWeeklyReportAt] = clock.now()
-        } > 0
+            it[lastWeeklyReportAt] = now
+        }
+        if (updated == 0) {
+            UserStatsTable.insert {
+                it[UserStatsTable.userId] = userId
+                it[currentStreak] = 0
+                it[lastActiveAt] = null
+                it[weeklyLessons] = 0
+                it[weeklyPractice] = 0
+                it[weeklyReview] = 0
+                it[weeklyHomework] = 0
+                it[lastWeeklyReportAt] = now
+            }
+        }
+        true
     }
 
     override suspend fun deleteByUser(userId: Long): Boolean = DatabaseFactory.dbQuery {
